@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Strategy Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>Strategy Tracker</h1>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <i class="fas fa-plus"></i> Add Stock
+                </button>
+                <button class="btn" style="background: #30363d; color: white;" onclick="updatePrices()">
+                    <i class="fas fa-sync-alt"></i> Update Prices
+                </button>
+            </div>
+        </header>
+
+        <div class="strategy-grid">
+            <div class="strategy-card" id="strategy-short">
+                <div class="strategy-header">
+                    <span class="strategy-name">Short Strategy</span>
+                    <span class="strategy-badge badge-short">Short Term</span>
+                </div>
+                <div class="upload-section">
+                    <button class="btn"
+                        style="width: 100%; margin-bottom: 15px; background: rgba(248, 81, 73, 0.1); border: 1px dashed var(--accent-red); color: var(--accent-red);"
+                        onclick="triggerUpload('Short')">
+                        <i class="fas fa-upload"></i> Upload Screen/Excel
+                    </button>
+                </div>
+                <div class="stock-list" id="list-short">
+                    <!-- Stocks will be injected here -->
+                </div>
+            </div>
+
+            <div class="strategy-card" id="strategy-long">
+                <div class="strategy-header">
+                    <span class="strategy-name">Long Strategy</span>
+                    <span class="strategy-badge badge-long">Medium Term</span>
+                </div>
+                <div class="upload-section">
+                    <button class="btn"
+                        style="width: 100%; margin-bottom: 15px; background: rgba(63, 185, 80, 0.1); border: 1px dashed var(--accent-green); color: var(--accent-green);"
+                        onclick="triggerUpload('Long')">
+                        <i class="fas fa-upload"></i> Upload Screen/Excel
+                    </button>
+                </div>
+                <div class="stock-list" id="list-long">
+                    <!-- Stocks will be injected here -->
+                </div>
+            </div>
+
+            <div class="strategy-card" id="strategy-investment">
+                <div class="strategy-header">
+                    <span class="strategy-name">Investment Strategy</span>
+                    <span class="strategy-badge badge-investment">Long Term</span>
+                </div>
+                <div class="upload-section">
+                    <button class="btn"
+                        style="width: 100%; margin-bottom: 15px; background: rgba(88, 166, 255, 0.1); border: 1px dashed var(--accent-blue); color: var(--accent-blue);"
+                        onclick="triggerUpload('Investment')">
+                        <i class="fas fa-upload"></i> Upload Screen/Excel
+                    </button>
+                </div>
+                <div class="stock-list" id="list-investment">
+                    <!-- Stocks will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <h2>Add New Stock</h2>
+            <div class="form-group">
+                <label>Ticker Symbol</label>
+                <input type="text" id="tickerInput" placeholder="AAPL, TSLA, etc.">
+            </div>
+            <div class="form-group">
+                <label>Strategy</label>
+                <select id="strategySelect">
+                    <option value="Short">Short</option>
+                    <option value="Long">Long</option>
+                    <option value="Investment">Investment</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn" style="background: transparent; color: var(--text-secondary);"
+                    onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="addStock()">Add Stock</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="fileUpload" style="display: none;" onchange="handleFileUpload(this)">
+
+    <div id="loading" class="loading-overlay">
+        <div style="text-align: center;">
+            <i class="fas fa-spinner fa-spin fa-3x" style="margin-bottom: 15px;"></i>
+            <p id="loadingText">Processing...</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+
+</html>
