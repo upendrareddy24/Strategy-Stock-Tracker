@@ -5,7 +5,7 @@ from utils import fetch_current_price, process_screenshot, process_excel
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_DATA_URI'] = 'sqlite:///stocks.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stocks.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
