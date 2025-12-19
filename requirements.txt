@@ -5,5 +5,5 @@ pytesseract
 pandas
 openpyxl
 pillow
-easyocr
 python-dotenv
+gunicorn
