@@ -100,9 +100,14 @@ def update_prices():
     return jsonify([s.to_dict() for s in stocks])
 
 if __name__ == '__main__':
+    # Use environment variables for production configuration
+    port = int(os.environ.get("PORT", 8001))
+    debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
+    
     with app.app_context():
-        # Correctly set the database URI before creating tables
-        # Actually app.config['SQLALCHEMY_DATABASE_URI'] was misspelled in my thought process but let's fix it here
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stocks.db'
+        # Ensure database URI is correct
+        if not app.config.get('SQLALCHEMY_DATABASE_URI'):
+            app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stocks.db'
         db.create_all()
-    app.run(debug=True, port=8001)
+        
+    app.run(host='0.0.0.0', port=port, debug=debug)
