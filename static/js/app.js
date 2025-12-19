@@ -16,9 +16,11 @@ function fetchStocks() {
 
 function renderStocks(stocks) {
     const lists = {
-        'Short': document.getElementById('list-short'),
-        'Long': document.getElementById('list-long'),
-        'Investment': document.getElementById('list-investment')
+        '1SQ_INSB_52W': document.getElementById('list-1SQ_INSB_52W'),
+        '2HvolHK': document.getElementById('list-2HvolHK'),
+        '2_3XvolSq': document.getElementById('list-2_3XvolSq'),
+        '2SQ_Bull_HK': document.getElementById('list-2SQ_Bull_HK'),
+        '2HK_RVOL_SQ': document.getElementById('list-2HK_RVOL_SQ')
     };
 
     // Clear lists
