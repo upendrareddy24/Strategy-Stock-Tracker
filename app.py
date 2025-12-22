@@ -5,13 +5,16 @@ from utils import fetch_current_price, process_screenshot, process_excel
 from datetime import datetime
 
 app = Flask(__name__)
-app = Flask(__name__)
 # Use absolute path for persistence
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or \
-    'sqlite:///' + os.path.join(basedir, 'instance', 'stocks.db')
+db_dir = os.path.join(basedir, 'instance')
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
 
-if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or \
+    'sqlite:///' + os.path.join(db_dir, 'stocks.db')
+
+if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
