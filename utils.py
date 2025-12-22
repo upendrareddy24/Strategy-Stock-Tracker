@@ -53,7 +53,7 @@ def process_screenshot(file_path):
 
 def process_excel(file_path):
     try:
-        # Read without header first to find the best column
+        # Read without header
         if file_path.endswith('.csv'):
             df = pd.read_csv(file_path, header=None)
         else:
@@ -62,35 +62,51 @@ def process_excel(file_path):
         if df.empty:
             return []
 
-        # Strategy 1: Look for a column that has "Symbol" or "Ticker" in any of its first few rows
-        for col in df.columns:
-            for val in df[col].head(10):
-                clean_val = str(val).lower().strip()
-                if any(kw in clean_val for kw in ['symbol', 'ticker', 'stock']):
-                    # Found the column! extract data below it
-                    data = df[col].dropna().astype(str).tolist()
-                    header_idx = 0
-                    for idx, v in enumerate(data):
-                        if any(kw in str(v).lower() for kw in ['symbol', 'ticker', 'stock']):
-                            header_idx = idx
-                            break
-                    return [t.strip().upper() for t in data[header_idx+1:] if re.match(r'^[A-Z]{1,6}$', t.strip().upper())]
-
-        # Strategy 2: "Smart Search" - find the column with the most ticker-like values
         ticker_pattern = re.compile(r'^[A-Z]{1,6}$')
-        best_col = None
-        max_tickers = 0
-        
+        column_results = []
+
         for col in df.columns:
-            # Clean and count ticker matches
-            count = sum(1 for val in df[col].astype(str) if ticker_pattern.match(str(val).strip().upper()))
-            if count > max_tickers:
-                max_tickers = count
-                best_col = col
+            # Drop NaN and convert to string
+            col_data = df[col].dropna().astype(str).tolist()
+            
+            # Extract items matching ticker pattern
+            valid_tickers = []
+            for item in col_data:
+                # Strip and clean: TOS sometimes has symbols like " AAPL" or symbols with prefix
+                # We also look for specific letter blocks in case of "8 Symbol"
+                clean_item = item.strip().upper()
+                if ticker_pattern.match(clean_item):
+                    valid_tickers.append(clean_item)
+                else:
+                    # Fallback: if it's "8 AMZN", try extracting the AMZN part
+                    matches = re.findall(r'\b[A-Z]{1,6}\b', clean_item)
+                    if matches:
+                        valid_tickers.extend(matches)
+
+            # Deduplicate while preserving order (mostly)
+            seen = set()
+            unique_tickers = [x for x in valid_tickers if not (x in seen or seen.add(x))]
+            
+            # Check for keywords in this column
+            has_keyword = any(any(kw in str(val).lower() for kw in ['symbol', 'ticker', 'stock']) for val in df[col].head(10))
+            
+            column_results.append({
+                'count': len(unique_tickers),
+                'tickers': unique_tickers,
+                'has_keyword': has_keyword,
+                'col_index': col
+            })
+
+        if not column_results:
+            return []
+
+        # Sort: Primary sort by ticker count, secondary by presence of keyword
+        # We want the column with the MOST tickers, especially if it was flagged with a keyword
+        column_results.sort(key=lambda x: (x['count'], x['has_keyword']), reverse=True)
         
-        if best_col is not None and max_tickers > 0:
-            # Filter specifically for the tickers in that column
-            return [str(val).strip().upper() for val in df[best_col].astype(str) if ticker_pattern.match(str(val).strip().upper())]
+        best_match = column_results[0]
+        if best_match['count'] > 0:
+            return best_match['tickers']
             
         return []
     except Exception as e:
