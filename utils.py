@@ -53,15 +53,37 @@ def process_screenshot(file_path):
 
 def process_excel(file_path):
     try:
+        # Read without header first to find the best column
         if file_path.endswith('.csv'):
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(file_path, header=None)
         else:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(file_path, header=None)
         
-        # Look for a 'Ticker' or 'Symbol' column
-        ticker_col = next((col for col in df.columns if col.lower() in ['ticker', 'symbol', 'stock']), None)
-        if ticker_col:
-            return df[ticker_col].dropna().astype(str).tolist()
+        if df.empty:
+            return []
+
+        # Strategy 1: Look for a column that has "Symbol" or "Ticker" in any of its first few rows
+        for col in df.columns:
+            for val in df[col].head(10):
+                if str(val).lower() in ['symbol', 'ticker', 'stock']:
+                    # Found the column! extract data below it
+                    return df[col].dropna().astype(str).tolist()[1:] # Skip header-like row
+
+        # Strategy 2: "Smart Search" - find the column with the most ticker-like values
+        ticker_pattern = re.compile(r'^[A-Z]{1,5}$')
+        best_col = None
+        max_tickers = 0
+        
+        for col in df.columns:
+            count = sum(1 for val in df[col].astype(str) if ticker_pattern.match(val))
+            if count > max_tickers:
+                max_tickers = count
+                best_col = col
+        
+        if best_col is not None and max_tickers > 0:
+            # Filter specifically for the tickers in that column
+            return [str(val).upper() for val in df[best_col].astype(str) if ticker_pattern.match(val)]
+            
         return []
     except Exception as e:
         print(f"Error processing excel: {e}")
