@@ -65,24 +65,32 @@ def process_excel(file_path):
         # Strategy 1: Look for a column that has "Symbol" or "Ticker" in any of its first few rows
         for col in df.columns:
             for val in df[col].head(10):
-                if str(val).lower() in ['symbol', 'ticker', 'stock']:
+                clean_val = str(val).lower().strip()
+                if any(kw in clean_val for kw in ['symbol', 'ticker', 'stock']):
                     # Found the column! extract data below it
-                    return df[col].dropna().astype(str).tolist()[1:] # Skip header-like row
+                    data = df[col].dropna().astype(str).tolist()
+                    header_idx = 0
+                    for idx, v in enumerate(data):
+                        if any(kw in str(v).lower() for kw in ['symbol', 'ticker', 'stock']):
+                            header_idx = idx
+                            break
+                    return [t.strip().upper() for t in data[header_idx+1:] if re.match(r'^[A-Z]{1,6}$', t.strip().upper())]
 
         # Strategy 2: "Smart Search" - find the column with the most ticker-like values
-        ticker_pattern = re.compile(r'^[A-Z]{1,5}$')
+        ticker_pattern = re.compile(r'^[A-Z]{1,6}$')
         best_col = None
         max_tickers = 0
         
         for col in df.columns:
-            count = sum(1 for val in df[col].astype(str) if ticker_pattern.match(val))
+            # Clean and count ticker matches
+            count = sum(1 for val in df[col].astype(str) if ticker_pattern.match(str(val).strip().upper()))
             if count > max_tickers:
                 max_tickers = count
                 best_col = col
         
         if best_col is not None and max_tickers > 0:
             # Filter specifically for the tickers in that column
-            return [str(val).upper() for val in df[best_col].astype(str) if ticker_pattern.match(val)]
+            return [str(val).strip().upper() for val in df[best_col].astype(str) if ticker_pattern.match(str(val).strip().upper())]
             
         return []
     except Exception as e:
