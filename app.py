@@ -74,11 +74,13 @@ def upload_file():
     file.save(file_path)
     
     tickers = []
-    if file.filename.endswith(('.png', '.jpg', '.jpeg')):
+    if file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
         tickers = process_screenshot(file_path)
-    elif file.filename.endswith(('.xlsx', '.xls', '.csv')):
+    elif file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
         tickers = process_excel(file_path)
         
+    print(f"DEBUG: Extracted {len(tickers)} tickers: {tickers}")
+    
     added_stocks = []
     for ticker in tickers:
         ticker = ticker.upper()
@@ -93,8 +95,12 @@ def upload_file():
             )
             db.session.add(new_stock)
             added_stocks.append(new_stock.to_dict())
+            print(f"DEBUG: Successfully added {ticker}")
+        else:
+            print(f"DEBUG: Failed to fetch price for {ticker}")
             
     db.session.commit()
+    print(f"DEBUG: Final added count: {len(added_stocks)}")
     return jsonify(added_stocks)
 
 @app.route('/api/delete_stock/<int:stock_id>', methods=['DELETE'])
