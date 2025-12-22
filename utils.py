@@ -54,67 +54,70 @@ def process_screenshot(file_path):
 def process_excel(file_path):
     print(f"DEBUG: Processing file: {file_path}")
     try:
-        # Read without header
+        # Step 1: Try reading with Pandas (most robust method)
+        df = None
         if file_path.endswith('.csv'):
-            # sep=None with engine='python' lets pandas auto-detect delimiters (tabs, commas, semicolons)
-            df = pd.read_csv(file_path, header=None, sep=None, engine='python')
+            try:
+                # We use on_bad_lines='skip' to handle cases where metadata rows have different column counts
+                df = pd.read_csv(file_path, header=None, sep=None, engine='python', on_bad_lines='skip')
+            except Exception as e:
+                print(f"DEBUG: Pandas CSV read failed: {e}. Falling back to raw text scan.")
         else:
-            df = pd.read_excel(file_path, header=None)
-        
-        if df.empty:
-            print("DEBUG: DataFrame is empty")
-            return []
+            try:
+                df = pd.read_excel(file_path, header=None)
+            except Exception as e:
+                print(f"DEBUG: Pandas Excel read failed: {e}")
 
-        print(f"DEBUG: DataFrame shape: {df.shape}")
-        
-        # Broaden pattern for tickers (allow dots like BRK.B, and numbers)
-        ticker_pattern = re.compile(r'^[A-Z0-9.]{1,8}$')
-        column_results = []
+        # Step 2: If Pandas worked, use the column-based scoring logic
+        if df is not None and not df.empty:
+            print(f"DEBUG: DataFrame loaded. Shape: {df.shape}")
+            ticker_pattern = re.compile(r'^[A-Z0-9.]{1,8}$')
+            ignore_list = ['PRICE', 'LAST', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG', 'DESC', '8', 'WATCH']
+            column_results = []
 
-        # Common words to ignore so headers don't get counted as tickers
-        ignore_list = ['PRICE', 'LAST', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG', 'DESC', '8', 'WATCH']
+            for col in df.columns:
+                col_data = df[col].dropna().astype(str).tolist()
+                valid_tickers = []
+                for item in col_data:
+                    clean_item = item.strip().upper()
+                    clean_item = re.sub(r'^\d+\s+', '', clean_item)
+                    if ticker_pattern.match(clean_item) and clean_item not in ignore_list:
+                        valid_tickers.append(clean_item)
+                    else:
+                        matches = re.findall(r'\b[A-Z0-9.]{1,8}\b', clean_item)
+                        for m in matches:
+                            if m not in ignore_list and any(c.isalpha() for c in m):
+                                valid_tickers.append(m)
 
-        for col in df.columns:
-            col_data = df[col].dropna().astype(str).tolist()
-            valid_tickers = []
-            
-            for item in col_data:
-                clean_item = item.strip().upper()
-                # Remove common noise prefixes
-                clean_item = re.sub(r'^\d+\s+', '', clean_item) # Remove leading numbers + space
+                seen = set()
+                unique_tickers = [x for x in valid_tickers if not (x in seen or seen.add(x))]
+                has_keyword = any(any(kw in str(val).lower() for kw in ['symbol', 'ticker', 'stock']) for val in df[col].head(15))
                 
-                if ticker_pattern.match(clean_item) and clean_item not in ignore_list:
-                    valid_tickers.append(clean_item)
-                else:
-                    # Look for ticker-like blocks inside the cell
-                    matches = re.findall(r'\b[A-Z0-9.]{1,8}\b', clean_item)
-                    for m in matches:
-                        if m not in ignore_list and any(c.isalpha() for c in m):
-                            valid_tickers.append(m)
+                column_results.append({'count': len(unique_tickers), 'tickers': unique_tickers, 'has_keyword': has_keyword, 'col_index': col})
 
+            column_results.sort(key=lambda x: (x['count'] > 2, x['has_keyword'], x['count']), reverse=True)
+            if column_results and column_results[0]['count'] > 0:
+                print(f"DEBUG: Selected Col {column_results[0]['col_index']} with {column_results[0]['count']} tickers")
+                return column_results[0]['tickers']
+
+        # Step 3: Foolproof Fallback (Raw Text Scan)
+        # If pandas failed OR found 0 tickers, we scan the whole file for ticker-like strings
+        print("DEBUG: Using Raw Text Fallback parsing...")
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+            # Find anything that looks like a ticker: 1-6 uppercase letters surrounded by boundaries
+            # We filter out known common headers manually
+            raw_matches = re.findall(r'\b[A-Z]{1,6}\b', content)
+            ignore_set = {'WATCHLIST', 'SYMBOL', 'DESCRIPTION', 'LAST', 'PRICE', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG'}
+            tickers = []
             seen = set()
-            unique_tickers = [x for x in valid_tickers if not (x in seen or seen.add(x))]
-            
-            has_keyword = any(any(kw in str(val).lower() for kw in ['symbol', 'ticker', 'stock']) for val in df[col].head(15))
-            
-            column_results.append({
-                'count': len(unique_tickers),
-                'tickers': unique_tickers,
-                'has_keyword': has_keyword,
-                'col_index': col
-            })
-            print(f"DEBUG: Col {col} - Tickers found: {len(unique_tickers)} | Keyword: {has_keyword}")
-
-        if not column_results:
-            return []
-
-        # Sort: Highly weight columns with a lot of tickers, then those with keywords
-        column_results.sort(key=lambda x: (x['count'] > 2, x['has_keyword'], x['count']), reverse=True)
-        
-        best_match = column_results[0]
-        print(f"DEBUG: Best column selected: {best_match['col_index']} with {best_match['count']} tickers")
-        return best_match['tickers']
+            for m in raw_matches:
+                if m not in ignore_set and m not in seen:
+                    tickers.append(m)
+                    seen.add(m)
+            print(f"DEBUG: Raw scan found {len(tickers)} potential tickers")
+            return tickers
             
     except Exception as e:
-        print(f"ERROR processing file: {e}")
+        print(f"ERROR: Final catch in process_excel: {e}")
         return []
