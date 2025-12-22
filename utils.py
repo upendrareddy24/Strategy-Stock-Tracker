@@ -16,16 +16,24 @@ import os
 def fetch_current_price(ticker):
     try:
         stock = yf.Ticker(ticker)
-        # Try to get price
-        info = stock.info
-        price = info.get('regularMarketPrice') or info.get('currentPrice')
+        # Get history for today and yesterday close to calculate chance
+        hist = stock.history(period="5d") # Get a few days to be safe
         
-        if not price:
-            # Fallback to history for fast_info or history
-            hist = stock.history(period="1d")
-            if not hist.empty:
-                price = hist['Close'].iloc[-1]
-        return price
+        if hist.empty:
+            return None
+            
+        current_price = hist['Close'].iloc[-1]
+        
+        # Calculate daily change
+        daily_change = 0.0
+        if len(hist) >= 2:
+            prev_close = hist['Close'].iloc[-2]
+            daily_change = ((current_price - prev_close) / prev_close) * 100
+            
+        return {
+            'price': current_price,
+            'daily_change': daily_change
+        }
     except Exception as e:
         print(f"Error fetching price for {ticker}: {e}")
         return None

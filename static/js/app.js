@@ -33,14 +33,30 @@ function renderStocks(stocks) {
         const roiClass = stock.roi >= 0 ? 'roi-positive' : 'roi-negative';
         const roiSign = stock.roi >= 0 ? '+' : '';
 
+        const dailyClass = stock.daily_change >= 0 ? 'roi-positive' : 'roi-negative';
+        const dailySign = stock.daily_change >= 0 ? '+' : '';
+
+        // Format date: "Oct 24, 2023"
+        const dateObj = new Date(stock.added_date);
+        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
         item.innerHTML = `
-            <div class="stock-info">
-                <span class="stock-ticker">${stock.ticker}</span>
-                <span class="stock-price">Entry: $${stock.entry_price.toFixed(2)} | Current: $${stock.current_price.toFixed(2)}</span>
+            <div class="stock-info" style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span class="stock-ticker">${stock.ticker}</span>
+                    <span style="font-size: 0.75rem; color: #8b949e; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">${dateStr}</span>
+                </div>
+                <div class="stock-price">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Entry: $${stock.entry_price.toFixed(2)}</span>
+                        <span>Cur: $${stock.current_price.toFixed(2)}</span>
+                    </div>
+                </div>
             </div>
-            <div class="stock-performance">
-                <div class="${roiClass}" style="font-weight: 700; font-size: 1.1rem;">${roiSign}${stock.roi}%</div>
-                <button onclick="deleteStock(${stock.id})" style="background: transparent; border: none; color: #8b949e; cursor: pointer; font-size: 0.8rem; margin-top: 5px;">
+            <div class="stock-performance" style="margin-left: 15px; display: flex; flex-direction: column; align-items: flex-end;">
+                <div class="${roiClass}" style="font-weight: 700; font-size: 1rem;">Total: ${roiSign}${stock.roi}%</div>
+                <div class="${dailyClass}" style="font-size: 0.85rem; margin-top: 2px;">Daily: ${dailySign}${stock.daily_change.toFixed(2)}%</div>
+                <button onclick="deleteStock(${stock.id})" style="background: transparent; border: none; color: #8b949e; cursor: pointer; font-size: 0.8rem; margin-top: 8px; padding: 4px;">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>

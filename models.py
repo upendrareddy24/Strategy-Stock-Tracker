@@ -9,6 +9,7 @@ class Stock(db.Model):
     strategy = db.Column(db.String(20), nullable=False) # 'Short', 'Long', 'Investment'
     entry_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=True)
+    daily_change = db.Column(db.Float, nullable=True)
     added_date = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
@@ -22,6 +23,7 @@ class Stock(db.Model):
             'strategy': self.strategy,
             'entry_price': self.entry_price,
             'current_price': self.current_price,
+            'daily_change': self.daily_change if self.daily_change is not None else 0.0,
             'added_date': self.added_date.strftime('%Y-%m-%d %H:%M:%S'),
             'roi': round(roi, 2)
         }

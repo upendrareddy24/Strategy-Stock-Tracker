@@ -5,7 +5,12 @@ from utils import fetch_current_price, process_screenshot, process_excel
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///stocks.db')
+app = Flask(__name__)
+# Use absolute path for persistence
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or \
+    'sqlite:///' + os.path.join(basedir, 'instance', 'stocks.db')
+
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 
@@ -36,15 +41,16 @@ def add_stock():
     ticker = data.get('ticker').upper()
     strategy = data.get('strategy')
     
-    price = fetch_current_price(ticker)
-    if not price:
+    price_data = fetch_current_price(ticker)
+    if not price_data:
         return jsonify({'error': 'Could not fetch price for ticker'}), 400
         
     new_stock = Stock(
         ticker=ticker,
         strategy=strategy,
-        entry_price=price,
-        current_price=price
+        entry_price=price_data['price'],
+        current_price=price_data['price'],
+        daily_change=price_data['daily_change']
     )
     db.session.add(new_stock)
     db.session.commit()
@@ -73,13 +79,14 @@ def upload_file():
     added_stocks = []
     for ticker in tickers:
         ticker = ticker.upper()
-        price = fetch_current_price(ticker)
-        if price:
+        price_data = fetch_current_price(ticker)
+        if price_data:
             new_stock = Stock(
                 ticker=ticker,
                 strategy=strategy,
-                entry_price=price,
-                current_price=price
+                entry_price=price_data['price'],
+                current_price=price_data['price'],
+                daily_change=price_data['daily_change']
             )
             db.session.add(new_stock)
             added_stocks.append(new_stock.to_dict())
@@ -100,9 +107,10 @@ def delete_stock(stock_id):
 def update_prices():
     stocks = Stock.query.all()
     for stock in stocks:
-        price = fetch_current_price(stock.ticker)
-        if price:
-            stock.current_price = price
+        price_data = fetch_current_price(stock.ticker)
+        if price_data:
+            stock.current_price = price_data['price']
+            stock.daily_change = price_data['daily_change']
     db.session.commit()
     return jsonify([s.to_dict() for s in stocks])
 
