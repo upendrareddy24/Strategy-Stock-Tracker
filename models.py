@@ -24,6 +24,6 @@ class Stock(db.Model):
             'entry_price': self.entry_price,
             'current_price': self.current_price,
             'daily_change': self.daily_change if self.daily_change is not None else 0.0,
-            'added_date': self.added_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'added_date': self.added_date.strftime('%Y-%m-%d %H:%M:%S') if self.added_date else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
             'roi': round(roi, 2)
         }

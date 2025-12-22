@@ -72,7 +72,7 @@ def process_excel(file_path):
         if df is not None and not df.empty:
             print(f"DEBUG: DataFrame loaded. Shape: {df.shape}")
             ticker_pattern = re.compile(r'^[A-Z0-9.]{1,8}$')
-            ignore_list = ['PRICE', 'LAST', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG', 'DESC', '8', 'WATCH']
+            ignore_list = ['SYMBOL', 'TICKER', 'STOCK', 'PRICE', 'LAST', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG', 'DESC', '8', 'WATCH']
             column_results = []
 
             for col in df.columns:

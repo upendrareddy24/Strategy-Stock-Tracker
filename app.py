@@ -81,9 +81,12 @@ def upload_file():
         
     print(f"DEBUG: Extracted {len(tickers)} tickers: {tickers}")
     
-    added_stocks = []
+    added_stocks_objects = []
     for ticker in tickers:
         ticker = ticker.upper()
+        if ticker in ['SYMBOL', 'TICKER']:
+            continue
+            
         price_data = fetch_current_price(ticker)
         if price_data:
             new_stock = Stock(
@@ -94,12 +97,14 @@ def upload_file():
                 daily_change=price_data['daily_change']
             )
             db.session.add(new_stock)
-            added_stocks.append(new_stock.to_dict())
-            print(f"DEBUG: Successfully added {ticker}")
+            added_stocks_objects.append(new_stock)
+            print(f"DEBUG: Staged {ticker} to database")
         else:
-            print(f"DEBUG: Failed to fetch price for {ticker}")
+            print(f"DEBUG: Failed to fetch price for {ticker}, skipping")
             
     db.session.commit()
+    
+    added_stocks = [s.to_dict() for s in added_stocks_objects]
     print(f"DEBUG: Final added count: {len(added_stocks)}")
     return jsonify(added_stocks)
 
