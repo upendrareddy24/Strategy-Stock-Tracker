@@ -22,13 +22,13 @@ def fetch_current_price(ticker):
         if hist.empty:
             return None
             
-        current_price = hist['Close'].iloc[-1]
+        current_price = float(hist['Close'].iloc[-1])
         
         # Calculate daily change
         daily_change = 0.0
         if len(hist) >= 2:
-            prev_close = hist['Close'].iloc[-2]
-            daily_change = ((current_price - prev_close) / prev_close) * 100
+            prev_close = float(hist['Close'].iloc[-2])
+            daily_change = float(((current_price - prev_close) / prev_close) * 100)
             
         return {
             'price': current_price,
