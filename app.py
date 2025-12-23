@@ -1,10 +1,12 @@
 import os
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from models import db, Stock
 from utils import fetch_current_price, process_screenshot, process_excel
 from datetime import datetime
 
 app = Flask(__name__)
+CORS(app) # Enable CORS for all routes
 # Use absolute path for persistence
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_dir = os.path.join(basedir, 'instance')
