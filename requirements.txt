@@ -9,3 +9,4 @@ python-dotenv
 gunicorn
 psycopg2-binary
 flask-cors
+google-genai
