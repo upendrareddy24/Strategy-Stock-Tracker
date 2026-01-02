@@ -4,6 +4,7 @@ from flask_cors import CORS
 from models import db, Stock, Strategy
 from utils import fetch_current_price, process_screenshot, process_excel, fetch_stock_catalyst
 from datetime import datetime
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -166,12 +167,13 @@ def add_stock():
     
     # Check for duplicate in same strategy
     existing = Stock.query.filter_by(ticker=ticker, strategy=strategy).first()
-    # Handle movement history
-    history = json.loads(existing.movement_history) if existing.movement_history else []
-    history.append(price_data['daily_change'])
-    existing.movement_history = json.dumps(history[-10:]) # Keep last 10 days
     
     if existing:
+        # Handle movement history for existing
+        history = json.loads(existing.movement_history) if existing.movement_history else []
+        history.append(price_data['daily_change'])
+        existing.movement_history = json.dumps(history[-10:])
+        
         existing.current_price = price_data['price']
         existing.daily_change = price_data['daily_change']
         existing.volume = price_data.get('volume', 0)
@@ -217,18 +219,35 @@ def upload_file():
         tickers = process_excel(file_path)
         
     added_stocks_objects = []
-    for ticker in tickers:
-        ticker = ticker.upper()
+    for ticker_data in tickers:
+        ticker = ticker_data['ticker'].upper()
         if ticker in ['SYMBOL', 'TICKER']:
             continue
             
-        price_data = fetch_current_price(ticker)
+        # Prioritize data from file, fallback to YF
+        price_data = None
+        if ticker_data.get('price', 0) > 0:
+            price_data = {
+                'price': ticker_data['price'],
+                'daily_change': ticker_data['daily_change'],
+                'relative_volume': ticker_data.get('relative_volume', 1.0),
+                'volume': 0 # Volume not usually in scanner export, but RVOL is
+            }
+        
+        if not price_data:
+            price_data = fetch_current_price(ticker)
+
         if price_data:
             catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'])
             
             # Duplicate check
             existing = Stock.query.filter_by(ticker=ticker, strategy=strategy).first()
             if existing:
+                # Update history
+                history = json.loads(existing.movement_history) if existing.movement_history else []
+                history.append(price_data['daily_change'])
+                existing.movement_history = json.dumps(history[-10:])
+                
                 existing.current_price = price_data['price']
                 existing.daily_change = price_data['daily_change']
                 existing.volume = price_data.get('volume', 0)

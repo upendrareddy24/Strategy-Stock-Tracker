@@ -104,13 +104,20 @@ def fetch_current_price(ticker):
         current_price = float(hist['Close'].iloc[-1])
         volume = int(hist['Volume'].iloc[-1])
         
-        # Calculate Relative Volume (RVOL) - matches Thinkorswim multipliers
-        # We compare today's volume to the average of the last 10 days
-        full_hist = stock.history(period="15d")
-        avg_volume = full_hist['Volume'].tail(11).head(10).mean() # Avg of previous 10 days
-        rel_volume = round(volume / avg_volume, 2) if avg_volume > 0 else 1.0
-        
-        # Calculate daily change
+        # If today's volume is 0 (pre-market), use previous day for display, but keep track
+        if volume == 0 and len(hist) >= 2:
+            volume = int(hist['Volume'].iloc[-2])
+
+        # Relative Volume (RVOL)
+        full_hist = stock.history(period="20d")
+        # Ensure we have enough data for a 10-day average
+        if len(full_hist) > 10:
+            avg_volume = full_hist['Volume'].iloc[-11:-1].mean()
+            rel_volume = round(volume / avg_volume, 2) if avg_volume > 0 else 1.0
+        else:
+            rel_volume = 1.0
+            
+        # Daily change
         daily_change = 0.0
         if len(hist) >= 2:
             prev_close = float(hist['Close'].iloc[-2])
@@ -142,70 +149,72 @@ def process_screenshot(file_path):
 def process_excel(file_path):
     print(f"DEBUG: Processing file: {file_path}")
     try:
-        # Step 1: Try reading with Pandas (most robust method)
         df = None
         if file_path.endswith('.csv'):
             try:
-                # We use on_bad_lines='skip' to handle cases where metadata rows have different column counts
                 df = pd.read_csv(file_path, header=None, sep=None, engine='python', on_bad_lines='skip')
-            except Exception as e:
-                print(f"DEBUG: Pandas CSV read failed: {e}. Falling back to raw text scan.")
+                # Try again with proper headers if first row looks like headers
+                df_header = pd.read_csv(file_path, sep=None, engine='python', on_bad_lines='skip')
+                if any(col.lower() in ['symbol', 'ticker'] for col in df_header.columns):
+                    df = df_header
+            except: pass
         else:
             try:
-                df = pd.read_excel(file_path, header=None)
-            except Exception as e:
-                print(f"DEBUG: Pandas Excel read failed: {e}")
+                df = pd.read_excel(file_path)
+            except: pass
 
-        # Step 2: If Pandas worked, use the column-based scoring logic
         if df is not None and not df.empty:
-            print(f"DEBUG: DataFrame loaded. Shape: {df.shape}")
-            ticker_pattern = re.compile(r'^[A-Z0-9.]{1,8}$')
-            ignore_list = ['SYMBOL', 'TICKER', 'STOCK', 'PRICE', 'LAST', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG', 'DESC', '8', 'WATCH']
-            column_results = []
-
+            # Map columns
+            col_map = {}
             for col in df.columns:
-                col_data = df[col].dropna().astype(str).tolist()
-                valid_tickers = []
-                for item in col_data:
-                    clean_item = item.strip().upper()
-                    clean_item = re.sub(r'^\d+\s+', '', clean_item)
-                    if ticker_pattern.match(clean_item) and clean_item not in ignore_list:
-                        valid_tickers.append(clean_item)
-                    else:
-                        matches = re.findall(r'\b[A-Z0-9.]{1,8}\b', clean_item)
-                        for m in matches:
-                            if m not in ignore_list and any(c.isalpha() for c in m):
-                                valid_tickers.append(m)
+                c_low = str(col).lower()
+                if 'symbol' in c_low or 'ticker' in c_low: col_map['ticker'] = col
+                if 'last' in c_low or 'price' in c_low: col_map['price'] = col
+                if '%change' in c_low or 'change' in c_low: col_map['change'] = col
+                if 'volume_nsort' in c_low or 'volume_sort' in c_low: col_map['rvol'] = col
+            
+            results = []
+            if 'ticker' in col_map:
+                for _, row in df.iterrows():
+                    ticker = str(row[col_map['ticker']]).strip().upper()
+                    if ticker and re.match(r'^[A-Z]{1,6}$', ticker) and ticker not in ['SYMBOL', 'TICKER']:
+                        # Extract data
+                        price = 0.0
+                        change = 0.0
+                        rvol = 1.0
+                        
+                        try:
+                            if 'price' in col_map:
+                                price_val = str(row[col_map['price']]).replace('$', '').replace(',', '')
+                                price = float(price_val)
+                            if 'change' in col_map:
+                                chg_val = str(row[col_map['change']]).replace('%', '').replace('+', '')
+                                change = float(chg_val)
+                            if 'rvol' in col_map:
+                                rvol = float(row[col_map['rvol']])
+                        except: pass
+                        
+                        results.append({
+                            'ticker': ticker,
+                            'price': price,
+                            'daily_change': change,
+                            'relative_volume': rvol
+                        })
+                if results: return results
 
-                seen = set()
-                unique_tickers = [x for x in valid_tickers if not (x in seen or seen.add(x))]
-                has_keyword = any(any(kw in str(val).lower() for kw in ['symbol', 'ticker', 'stock']) for val in df[col].head(15))
-                
-                column_results.append({'count': len(unique_tickers), 'tickers': unique_tickers, 'has_keyword': has_keyword, 'col_index': col})
-
-            column_results.sort(key=lambda x: (x['count'] > 2, x['has_keyword'], x['count']), reverse=True)
-            if column_results and column_results[0]['count'] > 0:
-                print(f"DEBUG: Selected Col {column_results[0]['col_index']} with {column_results[0]['count']} tickers")
-                return column_results[0]['tickers']
-
-        # Step 3: Foolproof Fallback (Raw Text Scan)
-        # If pandas failed OR found 0 tickers, we scan the whole file for ticker-like strings
-        print("DEBUG: Using Raw Text Fallback parsing...")
+        # Fallback to Ticker SCAN only (if column mapping failed or not an Excel structure)
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
-            # Find anything that looks like a ticker: 1-6 uppercase letters surrounded by boundaries
-            # We filter out known common headers manually
             raw_matches = re.findall(r'\b[A-Z]{1,6}\b', content)
             ignore_set = {'WATCHLIST', 'SYMBOL', 'DESCRIPTION', 'LAST', 'PRICE', 'CHANGE', 'VOLUME', 'HIGH', 'LOW', 'OPEN', 'CLOSE', 'NET', 'CHG'}
             tickers = []
             seen = set()
             for m in raw_matches:
                 if m not in ignore_set and m not in seen:
-                    tickers.append(m)
+                    tickers.append({'ticker': m})
                     seen.add(m)
-            print(f"DEBUG: Raw scan found {len(tickers)} potential tickers")
             return tickers
             
     except Exception as e:
-        print(f"ERROR: Final catch in process_excel: {e}")
+        print(f"ERROR: process_excel: {e}")
         return []
