@@ -74,6 +74,11 @@ with app.app_context():
         db.session.commit()
     except: db.session.rollback()
 
+    try:
+        db.session.execute(text('ALTER TABLE stock ADD COLUMN relative_volume FLOAT'))
+        db.session.commit()
+    except: db.session.rollback()
+
     # Populate strategies if empty
     if Strategy.query.count() == 0:
         for s in DEFAULT_STRATEGIES:
@@ -95,13 +100,13 @@ def export_data():
     output = io.StringIO()
     writer = csv.writer(output)
     
-    writer.writerow(['Ticker', 'Strategy', 'Entry Price', 'Current Price', 'ROI %', 'Daily Change %', 'Volume', 'First Tracked', 'Last Updated', 'Last Catalyst', 'Movement History'])
+    writer.writerow(['Ticker', 'Strategy', 'Entry Price', 'Current Price', 'ROI %', 'Daily Change %', 'Volume', 'Rel Vol (RVOL)', 'First Tracked', 'Last Updated', 'Last Catalyst', 'Movement History'])
     
     for s in stocks:
         writer.writerow([
             s.ticker, s.strategy, s.entry_price, s.current_price, 
             round(((s.current_price - s.entry_price)/s.entry_price)*100, 2),
-            s.daily_change, s.volume, s.first_tracked, s.added_date, s.last_catalyst, s.movement_history
+            s.daily_change, s.volume, s.relative_volume, s.first_tracked, s.added_date, s.last_catalyst, s.movement_history
         ])
     
     return Response(
@@ -170,6 +175,7 @@ def add_stock():
         existing.current_price = price_data['price']
         existing.daily_change = price_data['daily_change']
         existing.volume = price_data.get('volume', 0)
+        existing.relative_volume = price_data.get('relative_volume', 1.0)
         existing.last_catalyst = catalyst
         existing.added_date = datetime.utcnow() # Update date to move to top
         db.session.commit()
@@ -182,6 +188,7 @@ def add_stock():
         current_price=price_data['price'],
         daily_change=price_data['daily_change'],
         volume=price_data.get('volume', 0),
+        relative_volume=price_data.get('relative_volume', 1.0),
         movement_history=json.dumps([price_data['daily_change']]),
         last_catalyst=catalyst
     )
@@ -225,6 +232,7 @@ def upload_file():
                 existing.current_price = price_data['price']
                 existing.daily_change = price_data['daily_change']
                 existing.volume = price_data.get('volume', 0)
+                existing.relative_volume = price_data.get('relative_volume', 1.0)
                 existing.last_catalyst = catalyst
                 existing.added_date = datetime.utcnow()
                 added_stocks_objects.append(existing)
@@ -236,6 +244,7 @@ def upload_file():
                     current_price=price_data['price'],
                     daily_change=price_data['daily_change'],
                     volume=price_data.get('volume', 0),
+                    relative_volume=price_data.get('relative_volume', 1.0),
                     movement_history=json.dumps([price_data['daily_change']]),
                     last_catalyst=catalyst
                 )
@@ -268,6 +277,7 @@ def update_prices():
             stock.current_price = price_data['price']
             stock.daily_change = price_data['daily_change']
             stock.volume = price_data.get('volume', 0)
+            stock.relative_volume = price_data.get('relative_volume', 1.0)
             stock.last_catalyst = fetch_stock_catalyst(stock.ticker, stock.daily_change)
     db.session.commit()
     return jsonify([s.to_dict() for s in stocks])

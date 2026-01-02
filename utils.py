@@ -61,6 +61,12 @@ def fetch_current_price(ticker):
         current_price = float(hist['Close'].iloc[-1])
         volume = int(hist['Volume'].iloc[-1])
         
+        # Calculate Relative Volume (RVOL) - matches Thinkorswim multipliers
+        # We compare today's volume to the average of the last 10 days
+        full_hist = stock.history(period="15d")
+        avg_volume = full_hist['Volume'].tail(11).head(10).mean() # Avg of previous 10 days
+        rel_volume = round(volume / avg_volume, 2) if avg_volume > 0 else 1.0
+        
         # Calculate daily change
         daily_change = 0.0
         if len(hist) >= 2:
@@ -70,7 +76,8 @@ def fetch_current_price(ticker):
         return {
             'price': current_price,
             'daily_change': daily_change,
-            'volume': volume
+            'volume': volume,
+            'relative_volume': rel_volume
         }
     except Exception as e:
         print(f"Error fetching price for {ticker}: {e}")

@@ -126,7 +126,10 @@ function renderStocks(stocks) {
                             <span>Cur: $${stock.current_price.toFixed(2)}</span>
                         </div>
                         <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px;">
-                            Vol: ${formatVolume(stock.volume)}
+                            Vol: ${formatVolume(stock.volume)} | 
+                            <span style="color: ${stock.relative_volume >= 2 ? 'var(--accent-orange)' : 'var(--text-secondary)'}; font-weight: ${stock.relative_volume >= 2 ? '800' : '400'}">
+                                RVOL: ${stock.relative_volume.toFixed(2)}x
+                            </span>
                         </div>
                     </div>
                     <!-- Sparkline Container -->
