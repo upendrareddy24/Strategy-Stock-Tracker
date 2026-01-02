@@ -19,24 +19,67 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 def fetch_stock_catalyst(ticker, daily_change):
-    """Fetches recent news and uses AI to explain the daily move."""
+    """Fetches recent news and technical indicators to explain the move."""
     if not client:
         return "Connect Gemini API to see catalyst."
 
     try:
         stock = yf.Ticker(ticker)
-        news = stock.news[:3] # Get top 3 news items
+        # 1. Fetch Fundamental News
+        news = stock.news[:3] 
         headlines = [n.get('title', '') for n in news]
+        
+        # 2. Fetch Technical Context (1 Year of data for SMA calculation)
+        hist = stock.history(period="1y")
+        if hist.empty:
+            return "No data found."
+            
+        current_price = float(hist['Close'].iloc[-1])
+        vol_today = int(hist['Volume'].iloc[-1])
+        avg_vol = hist['Volume'].tail(20).mean()
+        rvol = round(vol_today / avg_vol, 2)
+        
+        # Indicators
+        sma50 = hist['Close'].tail(50).mean()
+        sma200 = hist['Close'].tail(200).mean()
+        ema8 = hist['Close'].ewm(span=8, adjust=False).mean().iloc[-1]
+        ema21 = hist['Close'].ewm(span=21, adjust=False).mean().iloc[-1]
+        
+        # Squeeze Detection (Bollinger Band Compression)
+        std_dev = hist['Close'].tail(20).std()
+        upper_bb = hist['Close'].tail(20).mean() + (2 * std_dev)
+        lower_bb = hist['Close'].tail(20).mean() - (2 * std_dev)
+        bb_width = (upper_bb - lower_bb) / current_price
+        
+        # RSI 14
+        delta = hist['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs.iloc[-1]))
+
+        technical_summary = f"""
+        Price: ${current_price:.2f}
+        RVOL: {rvol} (Relative Volume)
+        EMA 8/21: {ema8:.2f}/{ema21:.2f} ({'Bullish Crossover' if ema8 > ema21 else 'Bearish Slope'})
+        Price vs SMA50/200: {'Above Key MAs' if current_price > sma50 else 'Below Resistance'}
+        RSI: {rsi:.1f} ({'Overbought' if rsi > 70 else 'Oversold' if rsi < 30 else 'Neutral'})
+        BB Width: {bb_width:.3f} ({'Squeezing' if bb_width < 0.05 else 'Expanding'})
+        """
         
         direction = "up" if daily_change >= 0 else "down"
         
         prompt = f"""
-        Stock: {ticker}
-        Daily Change: {daily_change:.2f}% ({direction})
-        Recent Headlines: {json.dumps(headlines)}
+        As a Senior Market Analyst, explain WHY {ticker} moved {daily_change:.2f}% ({direction}) today.
+        
+        TECHNICAL DATA:
+        {technical_summary}
+        
+        RECENT HEADLINES:
+        {json.dumps(headlines)}
 
-        Explain in ONE SHORT sentence (max 15 words) the most likely reason this stock moved {direction} today based on the news. 
-        If no relevant news, summarize the overall sector or market sentiment for this stock.
+        Explain in ONE SHORT sentence (max 18 words) combining both technicals (EMAs, Squeeze, Breakout, RVOL) AND news catalyst.
+        Example: "Broke above 21-day EMA on high RVOL following positive FDA trial results."
         BE CONCISE. NO FLUFF.
         """
         
@@ -47,7 +90,7 @@ def fetch_stock_catalyst(ticker, daily_change):
         return response.text.strip()
     except Exception as e:
         print(f"Error fetching catalyst for {ticker}: {e}")
-        return "Market volatility."
+        return "Technical consolidation."
 
 def fetch_current_price(ticker):
     try:
