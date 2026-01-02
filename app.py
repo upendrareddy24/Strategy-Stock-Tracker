@@ -61,7 +61,8 @@ def index():
 
 @app.route('/api/stocks', methods=['GET'])
 def get_stocks():
-    stocks = Stock.query.all()
+    # Sort by date added (newest first)
+    stocks = Stock.query.order_by(Stock.added_date.desc()).all()
     return jsonify([s.to_dict() for s in stocks])
 
 @app.route('/api/strategies', methods=['GET'])
@@ -107,6 +108,16 @@ def add_stock():
         
     catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'])
     
+    # Check for duplicate in same strategy
+    existing = Stock.query.filter_by(ticker=ticker, strategy=strategy).first()
+    if existing:
+        existing.current_price = price_data['price']
+        existing.daily_change = price_data['daily_change']
+        existing.last_catalyst = catalyst
+        existing.added_date = datetime.utcnow() # Update date to move to top
+        db.session.commit()
+        return jsonify(existing.to_dict())
+
     new_stock = Stock(
         ticker=ticker,
         strategy=strategy,
@@ -148,16 +159,26 @@ def upload_file():
         price_data = fetch_current_price(ticker)
         if price_data:
             catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'])
-            new_stock = Stock(
-                ticker=ticker,
-                strategy=strategy,
-                entry_price=price_data['price'],
-                current_price=price_data['price'],
-                daily_change=price_data['daily_change'],
-                last_catalyst=catalyst
-            )
-            db.session.add(new_stock)
-            added_stocks_objects.append(new_stock)
+            
+            # Duplicate check
+            existing = Stock.query.filter_by(ticker=ticker, strategy=strategy).first()
+            if existing:
+                existing.current_price = price_data['price']
+                existing.daily_change = price_data['daily_change']
+                existing.last_catalyst = catalyst
+                existing.added_date = datetime.utcnow()
+                added_stocks_objects.append(existing)
+            else:
+                new_stock = Stock(
+                    ticker=ticker,
+                    strategy=strategy,
+                    entry_price=price_data['price'],
+                    current_price=price_data['price'],
+                    daily_change=price_data['daily_change'],
+                    last_catalyst=catalyst
+                )
+                db.session.add(new_stock)
+                added_stocks_objects.append(new_stock)
             
     db.session.commit()
     return jsonify([s.to_dict() for s in added_stocks_objects])
