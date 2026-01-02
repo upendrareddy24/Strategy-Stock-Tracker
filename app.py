@@ -37,6 +37,17 @@ DEFAULT_STRATEGIES = [
 
 with app.app_context():
     db.create_all()
+    # Auto-migration: Ensure last_catalyst column exists for old databases
+    from sqlalchemy import text
+    try:
+        db.session.execute(text('ALTER TABLE stock ADD COLUMN last_catalyst TEXT'))
+        db.session.commit()
+        print("DEBUG: Migration - Added last_catalyst column")
+    except Exception as e:
+        db.session.rollback()
+        # Probably already exists, which is fine
+        pass
+
     # Populate strategies if empty
     if Strategy.query.count() == 0:
         for s in DEFAULT_STRATEGIES:
