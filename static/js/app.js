@@ -75,7 +75,16 @@ function renderStocks(stocks) {
         if (!list) return;
 
         const item = document.createElement('div');
-        item.className = 'stock-item';
+
+        // Dynamic Trend Coloring
+        let trendClass = 'trend-neutral';
+        if (stock.daily_change > 0) trendClass = 'trend-positive';
+        else if (stock.daily_change < 0) trendClass = 'trend-negative';
+
+        // Buy Signal Detection (e.g., > 2.5% daily move)
+        const isBuySignal = stock.daily_change >= 2.5 ? 'buy-signal' : '';
+
+        item.className = `stock-item ${trendClass} ${isBuySignal}`;
 
         const roiClass = stock.roi >= 0 ? 'roi-positive' : 'roi-negative';
         const roiSign = stock.roi >= 0 ? '+' : '';
