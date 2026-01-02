@@ -125,6 +125,9 @@ function renderStocks(stocks) {
                             <span>Entry: $${stock.entry_price.toFixed(2)}</span>
                             <span>Cur: $${stock.current_price.toFixed(2)}</span>
                         </div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px;">
+                            Vol: ${formatVolume(stock.volume)}
+                        </div>
                     </div>
                     <!-- Sparkline Container -->
                     <div class="sparkline-container" data-values="${stock.movement_history.join(',')}" style="width: 60px; height: 25px;"></div>
@@ -201,6 +204,12 @@ function initSparklines() {
 
 function exportData() {
     window.location.href = '/api/export';
+}
+
+function formatVolume(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num;
 }
 
 async function renameStrategy(id, element) {

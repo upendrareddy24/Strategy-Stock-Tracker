@@ -59,6 +59,7 @@ def fetch_current_price(ticker):
             return None
             
         current_price = float(hist['Close'].iloc[-1])
+        volume = int(hist['Volume'].iloc[-1])
         
         # Calculate daily change
         daily_change = 0.0
@@ -68,7 +69,8 @@ def fetch_current_price(ticker):
             
         return {
             'price': current_price,
-            'daily_change': daily_change
+            'daily_change': daily_change,
+            'volume': volume
         }
     except Exception as e:
         print(f"Error fetching price for {ticker}: {e}")

@@ -10,6 +10,8 @@ class Strategy(db.Model):
     tier = db.Column(db.String(20), nullable=True) # Tier 1, Tier 2, etc.
     color = db.Column(db.String(20), nullable=True) # hex or css var
 
+import json
+
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ticker = db.Column(db.String(20), nullable=False)
@@ -17,6 +19,7 @@ class Stock(db.Model):
     entry_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=True)
     daily_change = db.Column(db.Float, nullable=True)
+    volume = db.Column(db.BigInteger, nullable=True)
     last_catalyst = db.Column(db.Text, nullable=True) # AI-generated reason for move
     first_tracked = db.Column(db.DateTime, default=datetime.utcnow)
     movement_history = db.Column(db.Text, nullable=True) # JSON list of daily % changes
@@ -34,6 +37,7 @@ class Stock(db.Model):
             'entry_price': self.entry_price,
             'current_price': self.current_price,
             'daily_change': self.daily_change if self.daily_change is not None else 0.0,
+            'volume': self.volume if self.volume is not None else 0,
             'last_catalyst': self.last_catalyst if self.last_catalyst else "No catalyst found.",
             'added_date': self.added_date.strftime('%Y-%m-%d %H:%M:%S') if self.added_date else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
             'first_tracked': self.first_tracked.strftime('%Y-%m-%d %H:%M:%S') if self.first_tracked else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
