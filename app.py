@@ -45,10 +45,24 @@ with app.app_context():
     except: db.session.rollback()
     
     try:
-        db.session.execute(text('ALTER TABLE stock ADD COLUMN first_tracked DATETIME'))
+        # PostgreSQL uses TIMESTAMP, SQLite uses DATETIME. 
+        # We try TIMESTAMP first for the Heroku production environment.
+        db.session.execute(text('ALTER TABLE stock ADD COLUMN first_tracked TIMESTAMP'))
         db.session.execute(text('UPDATE stock SET first_tracked = added_date WHERE first_tracked IS NULL'))
         db.session.commit()
-    except: db.session.rollback()
+        print("DEBUG: Migration - Added first_tracked column (TIMESTAMP)")
+    except Exception as e:
+        db.session.rollback()
+        # Fallback for SQLite (local)
+        try:
+            db.session.execute(text('ALTER TABLE stock ADD COLUMN first_tracked DATETIME'))
+            db.session.execute(text('UPDATE stock SET first_tracked = added_date WHERE first_tracked IS NULL'))
+            db.session.commit()
+            print("DEBUG: Migration - Added first_tracked column (DATETIME)")
+        except:
+            db.session.rollback()
+            # Column likely already exists or other error we skip
+            pass
 
     # Populate strategies if empty
     if Strategy.query.count() == 0:
