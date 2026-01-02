@@ -17,6 +17,7 @@ class Stock(db.Model):
     entry_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=True)
     daily_change = db.Column(db.Float, nullable=True)
+    last_catalyst = db.Column(db.Text, nullable=True) # AI-generated reason for move
     added_date = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
@@ -31,6 +32,7 @@ class Stock(db.Model):
             'entry_price': self.entry_price,
             'current_price': self.current_price,
             'daily_change': self.daily_change if self.daily_change is not None else 0.0,
+            'last_catalyst': self.last_catalyst if self.last_catalyst else "No catalyst found.",
             'added_date': self.added_date.strftime('%Y-%m-%d %H:%M:%S') if self.added_date else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
             'roi': round(roi, 2)
         }

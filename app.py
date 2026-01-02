@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from models import db, Stock, Strategy
-from utils import fetch_current_price, process_screenshot, process_excel
+from utils import fetch_current_price, process_screenshot, process_excel, fetch_stock_catalyst
 from datetime import datetime
 
 app = Flask(__name__)
@@ -94,12 +94,15 @@ def add_stock():
     if not price_data:
         return jsonify({'error': 'Could not fetch price for ticker'}), 400
         
+    catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'])
+    
     new_stock = Stock(
         ticker=ticker,
         strategy=strategy,
         entry_price=price_data['price'],
         current_price=price_data['price'],
-        daily_change=price_data['daily_change']
+        daily_change=price_data['daily_change'],
+        last_catalyst=catalyst
     )
     db.session.add(new_stock)
     db.session.commit()
@@ -133,12 +136,14 @@ def upload_file():
             
         price_data = fetch_current_price(ticker)
         if price_data:
+            catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'])
             new_stock = Stock(
                 ticker=ticker,
                 strategy=strategy,
                 entry_price=price_data['price'],
                 current_price=price_data['price'],
-                daily_change=price_data['daily_change']
+                daily_change=price_data['daily_change'],
+                last_catalyst=catalyst
             )
             db.session.add(new_stock)
             added_stocks_objects.append(new_stock)
@@ -163,6 +168,7 @@ def update_prices():
         if price_data:
             stock.current_price = price_data['price']
             stock.daily_change = price_data['daily_change']
+            stock.last_catalyst = fetch_stock_catalyst(stock.ticker, stock.daily_change)
     db.session.commit()
     return jsonify([s.to_dict() for s in stocks])
 

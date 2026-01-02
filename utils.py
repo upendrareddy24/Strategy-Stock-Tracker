@@ -8,10 +8,46 @@ try:
 except ImportError:
     Image = None
 
+import os
 import yfinance as yf
 import pandas as pd
 import re
-import os
+import json
+from google import genai
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+def fetch_stock_catalyst(ticker, daily_change):
+    """Fetches recent news and uses AI to explain the daily move."""
+    if not client:
+        return "Connect Gemini API to see catalyst."
+
+    try:
+        stock = yf.Ticker(ticker)
+        news = stock.news[:3] # Get top 3 news items
+        headlines = [n.get('title', '') for n in news]
+        
+        direction = "up" if daily_change >= 0 else "down"
+        
+        prompt = f"""
+        Stock: {ticker}
+        Daily Change: {daily_change:.2f}% ({direction})
+        Recent Headlines: {json.dumps(headlines)}
+
+        Explain in ONE SHORT sentence (max 15 words) the most likely reason this stock moved {direction} today based on the news. 
+        If no relevant news, summarize the overall sector or market sentiment for this stock.
+        BE CONCISE. NO FLUFF.
+        """
+        
+        response = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"Error fetching catalyst for {ticker}: {e}")
+        return "Market volatility."
 
 def fetch_current_price(ticker):
     try:

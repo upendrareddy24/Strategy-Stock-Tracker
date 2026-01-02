@@ -98,6 +98,10 @@ function renderStocks(stocks) {
                         <span>Cur: $${stock.current_price.toFixed(2)}</span>
                     </div>
                 </div>
+                <div style="margin-top: 10px; font-size: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; color: #8b949e; line-height: 1.4;">
+                    <i class="fas fa-bolt" style="color: var(--accent-orange); margin-right: 5px;"></i>
+                    <span style="font-style: italic;">${stock.last_catalyst}</span>
+                </div>
             </div>
             <div style="margin-left: 15px; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;">
                 <div style="text-align: right;">
