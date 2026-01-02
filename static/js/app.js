@@ -39,6 +39,18 @@ function renderStrategyCards() {
                 </div>
                 <span class="strategy-badge" style="background: ${strat.color}22; color: ${strat.color}; border: 1px solid ${strat.color}44;">${strat.tier}</span>
             </div>
+            
+            <div id="stats-${strat.name}" style="display: flex; gap: 10px; margin-bottom: 20px; font-size: 0.75rem; font-weight: 700;">
+                <div style="flex: 1; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--text-secondary); text-transform: uppercase; font-size: 0.6rem; margin-bottom: 2px;">Strat ROI</div>
+                    <span class="strat-roi-val" style="color: white;">0.00%</span>
+                </div>
+                <div style="flex: 1; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--text-secondary); text-transform: uppercase; font-size: 0.6rem; margin-bottom: 2px;">Win Rate</div>
+                    <span class="strat-win-val" style="color: white;">0%</span>
+                </div>
+            </div>
+
             <div class="upload-section">
                 <button class="btn"
                     style="width: 100%; margin-bottom: 20px; background: ${strat.color}11; border: 1px dashed ${strat.color}66; color: ${strat.color};"
@@ -129,6 +141,27 @@ function renderStocks(stocks) {
             </div>
         `;
         list.appendChild(item);
+    });
+
+    // Calculate Analytics per Strategy
+    strategies.forEach(strat => {
+        const stratStocks = stocks.filter(s => s.strategy === strat.name);
+        const statsEl = document.getElementById(`stats-${strat.name}`);
+        if (!statsEl || stratStocks.length === 0) return;
+
+        const totalRoi = stratStocks.reduce((acc, s) => acc + s.roi, 0);
+        const avgRoi = totalRoi / stratStocks.length;
+        const winners = stratStocks.filter(s => s.roi > 0).length;
+        const winRate = (winners / stratStocks.length) * 100;
+
+        const roiValEl = statsEl.querySelector('.strat-roi-val');
+        const winValEl = statsEl.querySelector('.strat-win-val');
+
+        roiValEl.innerText = `${avgRoi.toFixed(2)}%`;
+        roiValEl.style.color = avgRoi >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+        winValEl.innerText = `${winRate.toFixed(0)}%`;
+        winValEl.style.color = winRate >= 50 ? 'var(--accent-green)' : 'var(--text-primary)';
     });
 }
 
