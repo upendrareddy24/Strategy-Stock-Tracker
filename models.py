@@ -19,6 +19,7 @@ class Stock(db.Model):
     daily_change = db.Column(db.Float, nullable=True)
     last_catalyst = db.Column(db.Text, nullable=True) # AI-generated reason for move
     added_date = db.Column(db.DateTime, default=datetime.utcnow)
+    first_tracked = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
         roi = 0
@@ -34,5 +35,6 @@ class Stock(db.Model):
             'daily_change': self.daily_change if self.daily_change is not None else 0.0,
             'last_catalyst': self.last_catalyst if self.last_catalyst else "No catalyst found.",
             'added_date': self.added_date.strftime('%Y-%m-%d %H:%M:%S') if self.added_date else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+            'first_tracked': self.first_tracked.strftime('%Y-%m-%d %H:%M:%S') if self.first_tracked else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
             'roi': round(roi, 2)
         }

@@ -42,11 +42,13 @@ with app.app_context():
     try:
         db.session.execute(text('ALTER TABLE stock ADD COLUMN last_catalyst TEXT'))
         db.session.commit()
-        print("DEBUG: Migration - Added last_catalyst column")
-    except Exception as e:
-        db.session.rollback()
-        # Probably already exists, which is fine
-        pass
+    except: db.session.rollback()
+    
+    try:
+        db.session.execute(text('ALTER TABLE stock ADD COLUMN first_tracked DATETIME'))
+        db.session.execute(text('UPDATE stock SET first_tracked = added_date WHERE first_tracked IS NULL'))
+        db.session.commit()
+    except: db.session.rollback()
 
     # Populate strategies if empty
     if Strategy.query.count() == 0:

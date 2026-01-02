@@ -86,11 +86,17 @@ function renderStocks(stocks) {
         const dateObj = new Date(stock.added_date);
         const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+        const firstTrackedObj = new Date(stock.first_tracked);
+        const firstTrackedStr = firstTrackedObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
         item.innerHTML = `
             <div style="flex: 1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span class="stock-ticker">${stock.ticker}</span>
-                    <span style="font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7;">${dateStr}</span>
+                    <div style="text-align: right;">
+                        <span style="display: block; font-size: 0.7rem; color: var(--accent-blue); opacity: 0.9; font-weight: 600;">Last Check: ${dateStr}</span>
+                        <span style="display: block; font-size: 0.65rem; color: var(--text-secondary); opacity: 0.6;">Tracking since: ${firstTrackedStr}</span>
+                    </div>
                 </div>
                 <div style="font-size: 0.85rem; color: var(--text-secondary);">
                     <div style="display: flex; justify-content: space-between;">
