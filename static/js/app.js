@@ -1,32 +1,79 @@
 let currentStrategyForUpload = null;
+let strategies = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    fetchStocks();
+    init();
 });
 
-function fetchStocks() {
-    showLoading('Loading stocks...');
-    fetch('/api/stocks')
-        .then(res => res.json())
-        .then(stocks => {
-            renderStocks(stocks);
-            hideLoading();
-        });
+async function init() {
+    showLoading('Initializing dashboard...');
+    await fetchStrategies();
+    await fetchStocks();
+    hideLoading();
+}
+
+async function fetchStrategies() {
+    const res = await fetch('/api/strategies');
+    strategies = await res.json();
+    renderStrategyCards();
+    updateStrategySelect();
+}
+
+function renderStrategyCards() {
+    const grid = document.getElementById('strategyGrid');
+    grid.innerHTML = '';
+
+    strategies.forEach(strat => {
+        const card = document.createElement('div');
+        card.className = 'strategy-card';
+        card.id = `strategy-${strat.name}`;
+
+        card.innerHTML = `
+            <div class="strategy-header">
+                <div class="strategy-title-container">
+                    <span class="strategy-name" 
+                          contenteditable="true" 
+                          onblur="renameStrategy(${strat.id}, this)"
+                          onkeydown="handleRenameKey(event, this)">${strat.display_name}</span>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">${strat.name}</div>
+                </div>
+                <span class="strategy-badge" style="background: ${strat.color}22; color: ${strat.color}; border: 1px solid ${strat.color}44;">${strat.tier}</span>
+            </div>
+            <div class="upload-section">
+                <button class="btn"
+                    style="width: 100%; margin-bottom: 20px; background: ${strat.color}11; border: 1px dashed ${strat.color}66; color: ${strat.color};"
+                    onclick="triggerUpload('${strat.name}')">
+                    <i class="fas fa-file-upload"></i> Upload Selection
+                </button>
+            </div>
+            <div class="stock-list" id="list-${strat.name}"></div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function updateStrategySelect() {
+    const select = document.getElementById('strategySelect');
+    select.innerHTML = strategies.map(s => `<option value="${s.name}">${s.display_name}</option>`).join('');
+}
+
+async function fetchStocks() {
+    const res = await fetch('/api/stocks');
+    const stocks = await res.json();
+    renderStocks(stocks);
 }
 
 function renderStocks(stocks) {
-    const lists = {
-        '1SQ_INSB_52W': document.getElementById('list-1SQ_INSB_52W'),
-        '2HvolHK': document.getElementById('list-2HvolHK'),
-        '2_3XvolSq': document.getElementById('list-2_3XvolSq'),
-        '2SQ_Bull_HK': document.getElementById('list-2SQ_Bull_HK'),
-        '2HK_RVOL_SQ': document.getElementById('list-2HK_RVOL_SQ')
-    };
-
-    // Clear lists
-    Object.values(lists).forEach(list => list.innerHTML = '');
+    // Clear all lists first
+    strategies.forEach(strat => {
+        const list = document.getElementById(`list-${strat.name}`);
+        if (list) list.innerHTML = '';
+    });
 
     stocks.forEach(stock => {
+        const list = document.getElementById(`list-${stock.strategy}`);
+        if (!list) return;
+
         const item = document.createElement('div');
         item.className = 'stock-item';
 
@@ -36,36 +83,72 @@ function renderStocks(stocks) {
         const dailyClass = stock.daily_change >= 0 ? 'roi-positive' : 'roi-negative';
         const dailySign = stock.daily_change >= 0 ? '+' : '';
 
-        // Format date: "Oct 24, 2023"
         const dateObj = new Date(stock.added_date);
         const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
         item.innerHTML = `
-            <div class="stock-info" style="flex: 1;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span class="stock-ticker">${stock.ticker}</span>
-                    <span style="font-size: 0.75rem; color: #8b949e; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">${dateStr}</span>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7;">${dateStr}</span>
                 </div>
-                <div class="stock-price">
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">
                     <div style="display: flex; justify-content: space-between;">
                         <span>Entry: $${stock.entry_price.toFixed(2)}</span>
                         <span>Cur: $${stock.current_price.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
-            <div class="stock-performance" style="margin-left: 15px; display: flex; flex-direction: column; align-items: flex-end;">
-                <div class="${roiClass}" style="font-weight: 700; font-size: 1rem;">Total: ${roiSign}${stock.roi}%</div>
-                <div class="${dailyClass}" style="font-size: 0.85rem; margin-top: 2px;">Daily: ${dailySign}${stock.daily_change.toFixed(2)}%</div>
-                <button onclick="deleteStock(${stock.id})" style="background: transparent; border: none; color: #8b949e; cursor: pointer; font-size: 0.8rem; margin-top: 8px; padding: 4px;">
-                    <i class="fas fa-trash"></i>
+            <div style="margin-left: 15px; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;">
+                <div style="text-align: right;">
+                    <div class="${roiClass}" style="font-weight: 700; font-size: 1rem;">${roiSign}${stock.roi}%</div>
+                    <div class="${dailyClass}" style="font-size: 0.75rem;">${dailySign}${stock.daily_change.toFixed(2)}%</div>
+                </div>
+                <button onclick="deleteStock(${stock.id})" style="background: transparent; border: none; color: #444; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='#444'">
+                    <i class="fas fa-times-circle"></i>
                 </button>
             </div>
         `;
-
-        if (lists[stock.strategy]) {
-            lists[stock.strategy].appendChild(item);
-        }
+        list.appendChild(item);
     });
+}
+
+async function renameStrategy(id, element) {
+    const newName = element.innerText.trim();
+    if (!newName) return;
+
+    try {
+        const res = await fetch('/api/rename_strategy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, display_name: newName })
+        });
+        const data = await res.json();
+        if (data.success) {
+            // Update local strategy object and select box
+            const strat = strategies.find(s => s.id === id);
+            if (strat) strat.display_name = newName;
+            updateStrategySelect();
+        }
+    } catch (err) {
+        console.error('Rename failed', err);
+    }
+}
+
+function handleRenameKey(e, element) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        element.blur();
+    }
+}
+
+async function clearAll() {
+    if (!confirm('CRITICAL ACTION: Delete all tickers in all strategies?')) return;
+
+    showLoading('Purging tracker data...');
+    await fetch('/api/clear_all', { method: 'DELETE' });
+    await fetchStocks();
+    hideLoading();
 }
 
 function openAddModal() {
@@ -76,45 +159,43 @@ function closeModal() {
     document.getElementById('addModal').style.display = 'none';
 }
 
-function addStock() {
-    const ticker = document.getElementById('tickerInput').value;
+async function addStock() {
+    const ticker = document.getElementById('tickerInput').value.trim();
     const strategy = document.getElementById('strategySelect').value;
 
     if (!ticker) return alert('Please enter a ticker');
 
-    showLoading('Adding stock...');
-    fetch('/api/add_stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticker, strategy })
-    })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) alert(data.error);
-            else {
-                fetchStocks();
-                closeModal();
-                document.getElementById('tickerInput').value = '';
-            }
-        })
-        .catch(err => alert('Error adding stock'));
-}
-
-function deleteStock(id) {
-    if (!confirm('Are you sure you want to delete this stock?')) return;
-
-    fetch(`/api/delete_stock/${id}`, { method: 'DELETE' })
-        .then(() => fetchStocks());
-}
-
-function updatePrices() {
-    showLoading('Updating live prices...');
-    fetch('/api/update_prices')
-        .then(res => res.json())
-        .then(stocks => {
-            renderStocks(stocks);
-            hideLoading();
+    showLoading(`Fetching live data for ${ticker}...`);
+    try {
+        const res = await fetch('/api/add_stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker, strategy })
         });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        else {
+            await fetchStocks();
+            closeModal();
+            document.getElementById('tickerInput').value = '';
+        }
+    } catch (err) {
+        alert('Error connection to server');
+    }
+    hideLoading();
+}
+
+async function deleteStock(id) {
+    await fetch(`/api/delete_stock/${id}`, { method: 'DELETE' });
+    fetchStocks();
+}
+
+async function updatePrices() {
+    showLoading('Syncing global markets...');
+    const res = await fetch('/api/update_prices');
+    const stocks = await res.json();
+    renderStocks(stocks);
+    hideLoading();
 }
 
 function triggerUpload(strategy) {
@@ -122,7 +203,7 @@ function triggerUpload(strategy) {
     document.getElementById('fileUpload').click();
 }
 
-function handleFileUpload(input) {
+async function handleFileUpload(input) {
     if (!input.files || !input.files[0]) return;
 
     const file = input.files[0];
@@ -130,24 +211,23 @@ function handleFileUpload(input) {
     formData.append('file', file);
     formData.append('strategy', currentStrategyForUpload);
 
-    showLoading('Processing file with OCR/Excel analysis...');
-    fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-    })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) alert(data.error);
-            else {
-                fetchStocks();
-                alert(`Successfully added ${data.length} stocks!`);
-            }
-            input.value = '';
-        })
-        .catch(err => {
-            alert('Error uploading file');
-            hideLoading();
+    showLoading('AI Scanning: OCR & Excel Parse...');
+    try {
+        const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
         });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        else {
+            await fetchStocks();
+            alert(`Succesfully deployed ${data.length} tickers to ${currentStrategyForUpload}`);
+        }
+    } catch (err) {
+        alert('Upload integration failed');
+    }
+    input.value = '';
+    hideLoading();
 }
 
 function showLoading(text) {

@@ -4,101 +4,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Strategy Tracker</title>
+    <title>Stock Strategy Tracker Pro</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --accent-orange: #ffab00;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(90deg, #fff, #8b949e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: rgba(248, 81, 73, 0.1);
+            color: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+
+        .btn-danger:hover {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .strategy-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .strategy-card:hover {
+            border-color: #58a6ff66;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .strategy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .strategy-title-container {
+            flex: 1;
+        }
+
+        .strategy-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: white;
+            display: block;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+            padding: 2px 4px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .strategy-name:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-color);
+        }
+
+        .strategy-name:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-blue);
+        }
+
+        .strategy-badge {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+
+        .stock-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stock-ticker {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+        }
+
+        .roi-positive {
+            color: var(--accent-green);
+        }
+
+        .roi-negative {
+            color: var(--accent-red);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            border-radius: 16px;
+            width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: white;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.9);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+    </style>
 </head>
 
 <body>
     <div class="dashboard">
         <header>
-            <h1>Strategy Tracker</h1>
+            <div>
+                <h1>Strategy Tracker</h1>
+                <p style="color: var(--text-secondary); margin-top: 5px;">Pro-Grade Institutional Review Wizard</p>
+            </div>
             <div class="controls">
-                <button class="btn btn-primary" onclick="openAddModal()">
-                    <i class="fas fa-plus"></i> Add Stock
+                <button class="btn btn-danger" onclick="clearAll()">
+                    <i class="fas fa-trash-alt"></i> Clear All
                 </button>
                 <button class="btn" style="background: #30363d; color: white;" onclick="updatePrices()">
                     <i class="fas fa-sync-alt"></i> Update Prices
                 </button>
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <i class="fas fa-plus"></i> Add Stock
+                </button>
             </div>
         </header>
 
-        <div class="strategy-grid">
-            <div class="strategy-card" id="strategy-1SQ_INSB_52W">
-                <div class="strategy-header">
-                    <span class="strategy-name">1SQ_INSB_52W</span>
-                    <span class="strategy-badge badge-short">Tier 1</span>
-                </div>
-                <div class="upload-section">
-                    <button class="btn"
-                        style="width: 100%; margin-bottom: 15px; background: rgba(248, 81, 73, 0.1); border: 1px dashed var(--accent-red); color: var(--accent-red);"
-                        onclick="triggerUpload('1SQ_INSB_52W')">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                <div class="stock-list" id="list-1SQ_INSB_52W"></div>
-            </div>
-
-            <div class="strategy-card" id="strategy-2HvolHK">
-                <div class="strategy-header">
-                    <span class="strategy-name">2HvolHK</span>
-                    <span class="strategy-badge badge-long">Tier 2</span>
-                </div>
-                <div class="upload-section">
-                    <button class="btn"
-                        style="width: 100%; margin-bottom: 15px; background: rgba(63, 185, 80, 0.1); border: 1px dashed var(--accent-green); color: var(--accent-green);"
-                        onclick="triggerUpload('2HvolHK')">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                <div class="stock-list" id="list-2HvolHK"></div>
-            </div>
-
-            <div class="strategy-card" id="strategy-2_3XvolSq">
-                <div class="strategy-header">
-                    <span class="strategy-name">2_3XvolSq</span>
-                    <span class="strategy-badge badge-investment">Tier 3</span>
-                </div>
-                <div class="upload-section">
-                    <button class="btn"
-                        style="width: 100%; margin-bottom: 15px; background: rgba(88, 166, 255, 0.1); border: 1px dashed var(--accent-blue); color: var(--accent-blue);"
-                        onclick="triggerUpload('2_3XvolSq')">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                <div class="stock-list" id="list-2_3XvolSq"></div>
-            </div>
-
-            <div class="strategy-card" id="strategy-2SQ_Bull_HK">
-                <div class="strategy-header">
-                    <span class="strategy-name">2SQ_Bull_HK</span>
-                    <span class="strategy-badge badge-short" style="filter: hue-rotate(90deg);">Tier 4</span>
-                </div>
-                <div class="upload-section">
-                    <button class="btn"
-                        style="width: 100%; margin-bottom: 15px; background: rgba(188, 140, 255, 0.1); border: 1px dashed #bc8cff; color: #bc8cff;"
-                        onclick="triggerUpload('2SQ_Bull_HK')">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                <div class="stock-list" id="list-2SQ_Bull_HK"></div>
-            </div>
-
-            <div class="strategy-card" id="strategy-2HK_RVOL_SQ">
-                <div class="strategy-header">
-                    <span class="strategy-name">2HK_RVOL_SQ</span>
-                    <span class="strategy-badge badge-long" style="filter: hue-rotate(180deg);">Tier 5</span>
-                </div>
-                <div class="upload-section">
-                    <button class="btn"
-                        style="width: 100%; margin-bottom: 15px; background: rgba(255, 171, 0, 0.1); border: 1px dashed #ffab00; color: #ffab00;"
-                        onclick="triggerUpload('2HK_RVOL_SQ')">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-                <div class="stock-list" id="list-2HK_RVOL_SQ"></div>
-            </div>
+        <div class="strategy-grid" id="strategyGrid">
+            <!-- Dynamic Strategy Cards will be injected here -->
         </div>
     </div>
 
@@ -113,14 +290,10 @@
             <div class="form-group">
                 <label>Strategy</label>
                 <select id="strategySelect">
-                    <option value="1SQ_INSB_52W">1SQ_INSB_52W</option>
-                    <option value="2HvolHK">2HvolHK</option>
-                    <option value="2_3XvolSq">2_3XvolSq</option>
-                    <option value="2SQ_Bull_HK">2SQ_Bull_HK</option>
-                    <option value="2HK_RVOL_SQ">2HK_RVOL_SQ</option>
+                    <!-- Dynamic Options -->
                 </select>
             </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
                 <button class="btn" style="background: transparent; color: var(--text-secondary);"
                     onclick="closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="addStock()">Add Stock</button>
@@ -132,8 +305,8 @@
 
     <div id="loading" class="loading-overlay">
         <div style="text-align: center;">
-            <i class="fas fa-spinner fa-spin fa-3x" style="margin-bottom: 15px;"></i>
-            <p id="loadingText">Processing...</p>
+            <i class="fas fa-circle-notch fa-spin fa-3x" style="margin-bottom: 15px; color: var(--accent-blue);"></i>
+            <p id="loadingText" style="font-weight: 600;">Processing...</p>
         </div>
     </div>
 

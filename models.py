@@ -3,10 +3,17 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+class Strategy(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    display_name = db.Column(db.String(100), nullable=False)
+    tier = db.Column(db.String(20), nullable=True) # Tier 1, Tier 2, etc.
+    color = db.Column(db.String(20), nullable=True) # hex or css var
+
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ticker = db.Column(db.String(20), nullable=False)
-    strategy = db.Column(db.String(20), nullable=False) # 'Short', 'Long', 'Investment'
+    strategy = db.Column(db.String(50), nullable=False) 
     entry_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=True)
     daily_change = db.Column(db.Float, nullable=True)

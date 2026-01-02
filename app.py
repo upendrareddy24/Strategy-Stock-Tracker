@@ -1,13 +1,12 @@
 import os
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
-from models import db, Stock
+from models import db, Stock, Strategy
 from utils import fetch_current_price, process_screenshot, process_excel
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app) # Enable CORS for all routes
-# Use absolute path for persistence
+CORS(app)
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_dir = os.path.join(basedir, 'instance')
 if not os.path.exists(db_dir):
@@ -27,9 +26,23 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 
 db.init_app(app)
 
-# Create tables outside the main block so Gunicorn executes it
+# Default Strategies from user list
+DEFAULT_STRATEGIES = [
+    {"name": "2HK_Gainers", "display_name": "2HK_Gainers", "tier": "Tier 1", "color": "#f85149"},
+    {"name": "2HK_RVOL_SQ", "display_name": "2HK_RVOL_SQ", "tier": "Tier 2", "color": "#3fb950"},
+    {"name": "2HvolHK", "display_name": "2HvolHK", "tier": "Tier 3", "color": "#58a6ff"},
+    {"name": "2SQ_Bull_HK", "display_name": "2SQ_Bull_HK", "tier": "Tier 4", "color": "#bc8cff"},
+    {"name": "2_3XvolSq", "display_name": "2_3XvolSq", "tier": "Tier 5", "color": "#ffab00"}
+]
+
 with app.app_context():
     db.create_all()
+    # Populate strategies if empty
+    if Strategy.query.count() == 0:
+        for s in DEFAULT_STRATEGIES:
+            new_strat = Strategy(name=s['name'], display_name=s['display_name'], tier=s['tier'], color=s['color'])
+            db.session.add(new_strat)
+        db.session.commit()
 
 @app.route('/')
 def index():
@@ -39,6 +52,37 @@ def index():
 def get_stocks():
     stocks = Stock.query.all()
     return jsonify([s.to_dict() for s in stocks])
+
+@app.route('/api/strategies', methods=['GET'])
+def get_strategies():
+    strats = Strategy.query.all()
+    return jsonify([{
+        'id': s.id,
+        'name': s.name,
+        'display_name': s.display_name,
+        'tier': s.tier,
+        'color': s.color
+    } for s in strats])
+
+@app.route('/api/rename_strategy', methods=['POST'])
+def rename_strategy():
+    data = request.json
+    strat_id = data.get('id')
+    new_name = data.get('display_name')
+    
+    strat = Strategy.query.get(strat_id)
+    if strat:
+        strat.display_name = new_name
+        db.session.commit()
+        return jsonify({'success': True})
+    return jsonify({'error': 'Strategy not found'}), 404
+
+@app.route('/api/clear_all', methods=['DELETE'])
+def clear_all():
+    # Delete all stocks
+    Stock.query.delete()
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/api/add_stock', methods=['POST'])
 def add_stock():
@@ -81,8 +125,6 @@ def upload_file():
     elif file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
         tickers = process_excel(file_path)
         
-    print(f"DEBUG: Extracted {len(tickers)} tickers: {tickers}")
-    
     added_stocks_objects = []
     for ticker in tickers:
         ticker = ticker.upper()
@@ -100,15 +142,9 @@ def upload_file():
             )
             db.session.add(new_stock)
             added_stocks_objects.append(new_stock)
-            print(f"DEBUG: Staged {ticker} to database")
-        else:
-            print(f"DEBUG: Failed to fetch price for {ticker}, skipping")
             
     db.session.commit()
-    
-    added_stocks = [s.to_dict() for s in added_stocks_objects]
-    print(f"DEBUG: Final added count: {len(added_stocks)}")
-    return jsonify(added_stocks)
+    return jsonify([s.to_dict() for s in added_stocks_objects])
 
 @app.route('/api/delete_stock/<int:stock_id>', methods=['DELETE'])
 def delete_stock(stock_id):
@@ -131,7 +167,5 @@ def update_prices():
     return jsonify([s.to_dict() for s in stocks])
 
 if __name__ == '__main__':
-    # Use environment variables for production configuration
     port = int(os.environ.get("PORT", 8001))
-    debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=True)
