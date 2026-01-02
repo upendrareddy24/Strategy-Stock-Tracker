@@ -262,6 +262,10 @@
                 <p style="color: var(--text-secondary); margin-top: 5px;">Pro-Grade Institutional Review Wizard</p>
             </div>
             <div class="controls">
+                <button class="btn" style="background: rgba(88, 166, 255, 0.1); color: var(--accent-blue);"
+                    onclick="exportData()">
+                    <i class="fas fa-file-excel"></i> 30-Day Export
+                </button>
                 <button class="btn btn-danger" onclick="clearAll()">
                     <i class="fas fa-trash-alt"></i> Clear All
                 </button>
@@ -310,6 +314,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sparklines/2.1.2/jquery.sparkline.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 

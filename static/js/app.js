@@ -119,11 +119,15 @@ function renderStocks(stocks) {
                         <span style="display: block; font-size: 0.65rem; color: var(--text-secondary); opacity: 0.6;">Tracking since: ${firstTrackedStr}</span>
                     </div>
                 </div>
-                <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Entry: $${stock.entry_price.toFixed(2)}</span>
-                        <span>Cur: $${stock.current_price.toFixed(2)}</span>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 10px;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Entry: $${stock.entry_price.toFixed(2)}</span>
+                            <span>Cur: $${stock.current_price.toFixed(2)}</span>
+                        </div>
                     </div>
+                    <!-- Sparkline Container -->
+                    <div class="sparkline-container" data-values="${stock.movement_history.join(',')}" style="width: 60px; height: 25px;"></div>
                 </div>
                 <div style="margin-top: 10px; font-size: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; color: #8b949e; line-height: 1.4;">
                     <i class="fas fa-bolt" style="color: var(--accent-orange); margin-right: 5px;"></i>
@@ -163,6 +167,40 @@ function renderStocks(stocks) {
         winValEl.innerText = `${winRate.toFixed(0)}%`;
         winValEl.style.color = winRate >= 50 ? 'var(--accent-green)' : 'var(--text-primary)';
     });
+
+    initSparklines();
+}
+
+function initSparklines() {
+    // Simple SVG sparkline implementation since we want to avoid heavy dependencies
+    document.querySelectorAll('.sparkline-container').forEach(container => {
+        const values = container.getAttribute('data-values').split(',').map(Number).filter(v => !isNaN(v));
+        if (values.length < 2) return;
+
+        const width = 60;
+        const height = 25;
+        const min = Math.min(...values, 0);
+        const max = Math.max(...values, 1);
+        const range = max - min;
+
+        const points = values.map((v, i) => {
+            const x = (i / (values.length - 1)) * width;
+            const y = height - ((v - min) / range) * height;
+            return `${x},${y}`;
+        }).join(' ');
+
+        const color = values[values.length - 1] >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" style="overflow: visible;">
+                <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        `;
+    });
+}
+
+function exportData() {
+    window.location.href = '/api/export';
 }
 
 async function renameStrategy(id, element) {

@@ -64,6 +64,11 @@ with app.app_context():
             # Column likely already exists or other error we skip
             pass
 
+    try:
+        db.session.execute(text('ALTER TABLE stock ADD COLUMN movement_history TEXT'))
+        db.session.commit()
+    except: db.session.rollback()
+
     # Populate strategies if empty
     if Strategy.query.count() == 0:
         for s in DEFAULT_STRATEGIES:
@@ -74,6 +79,31 @@ with app.app_context():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/api/export', methods=['GET'])
+def export_data():
+    import csv
+    import io
+    from flask import Response
+    
+    stocks = Stock.query.all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(['Ticker', 'Strategy', 'Entry Price', 'Current Price', 'ROI %', 'Daily Change %', 'First Tracked', 'Last Updated', 'Last Catalyst', 'Movement History'])
+    
+    for s in stocks:
+        writer.writerow([
+            s.ticker, s.strategy, s.entry_price, s.current_price, 
+            round(((s.current_price - s.entry_price)/s.entry_price)*100, 2),
+            s.daily_change, s.first_tracked, s.added_date, s.last_catalyst, s.movement_history
+        ])
+    
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=strategy_report.csv"}
+    )
 
 @app.route('/api/stocks', methods=['GET'])
 def get_stocks():
@@ -126,6 +156,11 @@ def add_stock():
     
     # Check for duplicate in same strategy
     existing = Stock.query.filter_by(ticker=ticker, strategy=strategy).first()
+    # Handle movement history
+    history = json.loads(existing.movement_history) if existing.movement_history else []
+    history.append(price_data['daily_change'])
+    existing.movement_history = json.dumps(history[-10:]) # Keep last 10 days
+    
     if existing:
         existing.current_price = price_data['price']
         existing.daily_change = price_data['daily_change']
@@ -140,6 +175,7 @@ def add_stock():
         entry_price=price_data['price'],
         current_price=price_data['price'],
         daily_change=price_data['daily_change'],
+        movement_history=json.dumps([price_data['daily_change']]),
         last_catalyst=catalyst
     )
     db.session.add(new_stock)
@@ -214,6 +250,11 @@ def update_prices():
     for stock in stocks:
         price_data = fetch_current_price(stock.ticker)
         if price_data:
+            # Update history
+            history = json.loads(stock.movement_history) if stock.movement_history else []
+            history.append(price_data['daily_change'])
+            stock.movement_history = json.dumps(history[-10:]) # Keep last 10 days
+            
             stock.current_price = price_data['price']
             stock.daily_change = price_data['daily_change']
             stock.last_catalyst = fetch_stock_catalyst(stock.ticker, stock.daily_change)
