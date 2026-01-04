@@ -77,29 +77,49 @@ def fetch_stock_catalyst(ticker, daily_change, hist_df=None, include_news=True):
         return "Technical consolidation."
 
 def fetch_current_price(ticker):
-    """Ultra-fast fetcher for price, daily change, and volume using yf.download."""
+    """Ultra-fast fetcher for price, daily change, and volume using yf.download. Handles MultiIndex data."""
     try:
-        # yf.download is often much faster than Ticker.history() for single lookups
         import yfinance as yf
+        # Fetch 1mo for price + 20-day RVOL
         hist = yf.download(ticker, period="1mo", progress=False, timeout=10)
         
         if hist.empty:
+            print(f"DEBUG: No data returned for {ticker}")
             return None
             
-        current_price = float(hist['Close'].iloc[-1])
-        volume = int(hist['Volume'].iloc[-1])
+        # ROBUST COLUMN ACCESS: Handle cases where yf returns MultiIndex [Attribute, Ticker]
+        # We flatten the columns to handle both single and multi-index formats
+        data = {}
+        for col in ['Close', 'Volume']:
+            col_data = hist[col]
+            # If it's a MultiIndex DataFrame (columns are tickers), grab the one we asked for
+            if isinstance(col_data, pd.DataFrame):
+                ticker_col = ticker.upper()
+                if ticker_col in col_data.columns:
+                    data[col] = col_data[ticker_col]
+                else:
+                    data[col] = col_data.iloc[:, 0]
+            else:
+                data[col] = col_data
+
+        close_series = data['Close']
+        vol_series = data['Volume']
+
+        current_price = float(close_series.iloc[-1])
+        volume = int(vol_series.iloc[-1])
         
-        # RVOL Calculation from the 1mo history
-        if len(hist) > 11:
-            avg_volume = hist['Volume'].iloc[-11:-1].mean()
-            rel_volume = round(volume / avg_volume, 2) if avg_volume > 0 else 1.0
-        else:
-            rel_volume = 1.0
+        # RVOL Calculation (safely using scalars)
+        rel_volume = 1.0
+        if len(vol_series) > 11:
+            # Calculate mean of previous 10 days excluding today
+            avg_vol = float(vol_series.iloc[-11:-1].mean())
+            if avg_vol > 0:
+                rel_volume = round(volume / avg_vol, 2)
             
-        # Daily change
+        # Daily change (safely using scalars)
         daily_change = 0.0
-        if len(hist) >= 2:
-            prev_close = float(hist['Close'].iloc[-2])
+        if len(close_series) >= 2:
+            prev_close = float(close_series.iloc[-2])
             daily_change = float(((current_price - prev_close) / prev_close) * 100)
             
         return {
@@ -111,7 +131,14 @@ def fetch_current_price(ticker):
         }
     except Exception as e:
         print(f"Error fetching price for {ticker}: {e}")
-        return None
+        # Return a skeleton result so the app doesn't crash on manual add
+        return {
+            'price': 0.0,
+            'daily_change': 0.0,
+            'volume': 0,
+            'relative_volume': 1.0,
+            'error': str(e)
+        }
 
 def process_screenshot(file_path):
     if not pytesseract or not Image:
