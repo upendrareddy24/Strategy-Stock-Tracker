@@ -274,6 +274,12 @@ async function addStock() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ticker, strategy })
         });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `Server error: ${res.status}`);
+        }
+
         const data = await res.json();
         if (data.error) alert(data.error);
         else {
@@ -282,7 +288,8 @@ async function addStock() {
             document.getElementById('tickerInput').value = '';
         }
     } catch (err) {
-        alert('Error connection to server');
+        console.error("Add stock failed:", err);
+        alert(`System Busy: Heroku might be timing out or the ticker is unknown. Try again in a moment.`);
     }
     hideLoading();
 }
@@ -294,10 +301,17 @@ async function deleteStock(id) {
 
 async function updatePrices() {
     showLoading('Syncing global markets...');
-    const res = await fetch('/api/update_prices');
-    const stocks = await res.json();
-    renderStocks(stocks);
-    hideLoading();
+    try {
+        const res = await fetch('/api/update_prices');
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const stocks = await res.json();
+        renderStocks(stocks);
+    } catch (err) {
+        console.error("Update failed:", err);
+        alert("Market sync timed out or failed. Check console for details.");
+    } finally {
+        hideLoading();
+    }
 }
 
 function triggerUpload(strategy) {

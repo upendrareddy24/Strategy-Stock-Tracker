@@ -163,7 +163,8 @@ def add_stock():
     if not price_data:
         return jsonify({'error': 'Could not fetch price for ticker'}), 400
         
-    catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'])
+    # Optimized: pass the history dataframe and SKIP news fetch for instant add
+    catalyst = fetch_stock_catalyst(ticker, price_data['daily_change'], hist_df=price_data.get('hist_df'), include_news=False)
     
     # Check for duplicate in same strategy
     existing = Stock.query.filter_by(ticker=ticker, strategy=strategy).first()
@@ -297,7 +298,15 @@ def update_prices():
             stock.daily_change = price_data['daily_change']
             stock.volume = price_data.get('volume', 0)
             stock.relative_volume = price_data.get('relative_volume', 1.0)
-            stock.last_catalyst = fetch_stock_catalyst(stock.ticker, stock.daily_change)
+            stock.relative_volume = price_data.get('relative_volume', 1.0)
+            
+            # OPTIMIZATION: Only burn AI tokens for stocks that are actually moving or missing data
+            # This prevents the "Syncing" loop from timing out due to 20+ LLM calls
+            is_significant_move = abs(stock.daily_change) > 3.0
+            is_missing_data = not stock.last_catalyst or "Connect Gemini" in stock.last_catalyst
+            
+            if is_significant_move or is_missing_data:
+                stock.last_catalyst = fetch_stock_catalyst(stock.ticker, stock.daily_change)
     db.session.commit()
     return jsonify([s.to_dict() for s in stocks])
 
