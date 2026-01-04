@@ -77,11 +77,11 @@ def fetch_stock_catalyst(ticker, daily_change, hist_df=None, include_news=True):
         return "Technical consolidation."
 
 def fetch_current_price(ticker):
-    """Combined fetcher for price, daily change, volume, and RVOL with optimized network calls."""
+    """Ultra-fast fetcher for price, daily change, and volume using yf.download."""
     try:
-        stock = yf.Ticker(ticker)
-        # Fetch 6 months of data in ONE call - enough for RVOL (20d), EMA (21), SMA50 (50), etc.
-        hist = stock.history(period="6mo") 
+        # yf.download is often much faster than Ticker.history() for single lookups
+        import yfinance as yf
+        hist = yf.download(ticker, period="1mo", progress=False, timeout=10)
         
         if hist.empty:
             return None
@@ -89,7 +89,7 @@ def fetch_current_price(ticker):
         current_price = float(hist['Close'].iloc[-1])
         volume = int(hist['Volume'].iloc[-1])
         
-        # Relative Volume (RVOL) - calculated from the SAME dataframe
+        # RVOL Calculation from the 1mo history
         if len(hist) > 11:
             avg_volume = hist['Volume'].iloc[-11:-1].mean()
             rel_volume = round(volume / avg_volume, 2) if avg_volume > 0 else 1.0
@@ -107,7 +107,7 @@ def fetch_current_price(ticker):
             'daily_change': daily_change,
             'volume': volume,
             'relative_volume': rel_volume,
-            'hist_df': hist # Pass the DF along to avoid re-fetching
+            'hist_df': hist 
         }
     except Exception as e:
         print(f"Error fetching price for {ticker}: {e}")
