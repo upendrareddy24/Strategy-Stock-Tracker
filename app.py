@@ -88,7 +88,67 @@ with app.app_context():
 def index():
     return render_template('index.html')
 
-# ... (API endpoints)
+@app.route('/api/export', methods=['GET'])
+def export_data():
+    import csv
+    import io
+    from flask import Response
+    
+    stocks = Stock.query.all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(['Ticker', 'Strategy', 'Entry Price', 'Current Price', 'ROI %', 'Daily Change %', 'Volume', 'Rel Vol (RVOL)', 'First Tracked', 'Last Updated', 'Last Catalyst', 'Movement History'])
+    
+    for s in stocks:
+        writer.writerow([
+            s.ticker, s.strategy, s.entry_price, s.current_price, 
+            round(((s.current_price - s.entry_price)/s.entry_price)*100, 2),
+            s.daily_change, s.volume, s.relative_volume, s.first_tracked, s.added_date, s.last_catalyst, s.movement_history
+        ])
+    
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=strategy_report.csv"}
+    )
+
+@app.route('/api/stocks', methods=['GET'])
+def get_stocks():
+    # Sort by date added (newest first)
+    stocks = Stock.query.order_by(Stock.added_date.desc()).all()
+    return jsonify([s.to_dict() for s in stocks])
+
+@app.route('/api/strategies', methods=['GET'])
+def get_strategies():
+    strats = Strategy.query.all()
+    return jsonify([{
+        'id': s.id,
+        'name': s.name,
+        'display_name': s.display_name,
+        'tier': s.tier,
+        'color': s.color
+    } for s in strats])
+
+@app.route('/api/rename_strategy', methods=['POST'])
+def rename_strategy():
+    data = request.json
+    strat_id = data.get('id')
+    new_name = data.get('display_name')
+    
+    strat = Strategy.query.get(strat_id)
+    if strat:
+        strat.display_name = new_name
+        db.session.commit()
+        return jsonify({'success': True})
+    return jsonify({'error': 'Strategy not found'}), 404
+
+@app.route('/api/clear_all', methods=['DELETE'])
+def clear_all():
+    # Delete all stocks
+    Stock.query.delete()
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/api/add_stock', methods=['POST'])
 def add_stock():
