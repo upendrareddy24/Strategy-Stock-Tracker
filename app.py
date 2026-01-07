@@ -29,16 +29,16 @@ db.init_app(app)
 
 # Default Strategies from user list
 DEFAULT_STRATEGIES = [
-    {"name": "2HK_Gainers", "display_name": "2HK_Gainers", "tier": "Tier 1", "color": "#f85149"},
-    {"name": "2HK_RVOL_SQ", "display_name": "2HK_RVOL_SQ", "tier": "Tier 2", "color": "#3fb950"},
-    {"name": "2HvolHK", "display_name": "2HvolHK", "tier": "Tier 3", "color": "#58a6ff"},
-    {"name": "2SQ_Bull_HK", "display_name": "2SQ_Bull_HK", "tier": "Tier 4", "color": "#bc8cff"},
-    {"name": "2_3XvolSq", "display_name": "2_3XvolSq", "tier": "Tier 5", "color": "#ffab00"}
+    {"name": "Strategy_1", "display_name": "Active Strategy 1", "tier": "Input", "color": "#58a6ff"}, # Blue
+    {"name": "Strategy_2", "display_name": "Active Strategy 2", "tier": "Input", "color": "#bc8cff"}, # Purple
+    {"name": "Strategy_3", "display_name": "Active Strategy 3", "tier": "Input", "color": "#ffab00"}, # Orange
+    {"name": "Target_Reached", "display_name": "Target Reached (>= 5%)", "tier": "Winner", "color": "#3fb950"}, # Green
+    {"name": "Stop_Loss", "display_name": "Stop Loss / Expired (> 5 Days)", "tier": "Cut", "color": "#f85149"}   # Red
 ]
 
 with app.app_context():
     db.create_all()
-    # Auto-migration: Ensure last_catalyst column exists for old databases
+    # Auto-migration logic matches original...
     from sqlalchemy import text
     try:
         db.session.execute(text('ALTER TABLE stock ADD COLUMN last_catalyst TEXT'))
@@ -46,24 +46,16 @@ with app.app_context():
     except: db.session.rollback()
     
     try:
-        # PostgreSQL uses TIMESTAMP, SQLite uses DATETIME. 
-        # We try TIMESTAMP first for the Heroku production environment.
         db.session.execute(text('ALTER TABLE stock ADD COLUMN first_tracked TIMESTAMP'))
         db.session.execute(text('UPDATE stock SET first_tracked = added_date WHERE first_tracked IS NULL'))
         db.session.commit()
-        print("DEBUG: Migration - Added first_tracked column (TIMESTAMP)")
     except Exception as e:
         db.session.rollback()
-        # Fallback for SQLite (local)
         try:
             db.session.execute(text('ALTER TABLE stock ADD COLUMN first_tracked DATETIME'))
             db.session.execute(text('UPDATE stock SET first_tracked = added_date WHERE first_tracked IS NULL'))
             db.session.commit()
-            print("DEBUG: Migration - Added first_tracked column (DATETIME)")
-        except:
-            db.session.rollback()
-            # Column likely already exists or other error we skip
-            pass
+        except: pass
 
     try:
         db.session.execute(text('ALTER TABLE stock ADD COLUMN movement_history TEXT'))
@@ -80,12 +72,29 @@ with app.app_context():
         db.session.commit()
     except: db.session.rollback()
 
-    # Populate strategies if empty
-    if Strategy.query.count() == 0:
-        for s in DEFAULT_STRATEGIES:
+    # Sync Strategies: Remove old ones, Add new ones
+    existing_strategies = Strategy.query.all()
+    default_names = [s['name'] for s in DEFAULT_STRATEGIES]
+    
+    # 1. Delete Obsolete Strategies
+    for xs in existing_strategies:
+        if xs.name not in default_names:
+            print(f"DEBUG: Deleting obsolete strategy: {xs.name}")
+            db.session.delete(xs)
+    
+    # 2. Add/Update Default Strategies
+    for s in DEFAULT_STRATEGIES:
+        existing_strat = Strategy.query.filter_by(name=s['name']).first()
+        if not existing_strat:
             new_strat = Strategy(name=s['name'], display_name=s['display_name'], tier=s['tier'], color=s['color'])
             db.session.add(new_strat)
-        db.session.commit()
+        else:
+            # Force update display properties
+            existing_strat.display_name = s['display_name']
+            existing_strat.tier = s['tier']
+            existing_strat.color = s['color']
+            
+    db.session.commit()
 
 @app.route('/')
 def index():
@@ -286,7 +295,16 @@ def delete_stock(stock_id):
 @app.route('/api/update_prices', methods=['GET'])
 def update_prices():
     stocks = Stock.query.all()
+    
+    # Target and Stop Loss Strategy Names
+    STRAT_TARGET = "Target_Reached"
+    STRAT_STOP = "Stop_Loss"
+    
     for stock in stocks:
+        # Don't Auto-Move if already in outcome buckets
+        if stock.strategy in [STRAT_TARGET, STRAT_STOP]:
+            continue
+
         price_data = fetch_current_price(stock.ticker)
         if price_data:
             # Update history
@@ -298,15 +316,36 @@ def update_prices():
             stock.daily_change = price_data['daily_change']
             stock.volume = price_data.get('volume', 0)
             stock.relative_volume = price_data.get('relative_volume', 1.0)
-            stock.relative_volume = price_data.get('relative_volume', 1.0)
             
-            # OPTIMIZATION: Only burn AI tokens for stocks that are actually moving or missing data
+            # --- AUTO-MOVE LOGIC ---
+            # Rule 1: ROI >= 5%
+            roi = 0
+            if stock.entry_price > 0:
+                roi = (stock.current_price - stock.entry_price) / stock.entry_price
+            
+            days_held = (datetime.utcnow() - stock.added_date).days
+            
+            if roi >= 0.05:
+                # Target Reached
+                stock.strategy = STRAT_TARGET
+                # Optional: Force a catalyst update to explain the win?
+                stock.last_catalyst = f"🎯 TARGET HIT: {round(roi*100, 2)}% gain in {days_held} days!"
+            
+            elif days_held >= 5:
+                # Stop Loss / Expired
+                stock.strategy = STRAT_STOP
+                stock.last_catalyst = f"🛑 STOP/EXPIRED: Held for {days_held} days without reaching target."
+            
+            # --- AI CATALYST CHECK ---
+            # Only burn AI tokens for stocks that are actually moving or missing data
             # This prevents the "Syncing" loop from timing out due to 20+ LLM calls
             is_significant_move = abs(stock.daily_change) > 3.0
             is_missing_data = not stock.last_catalyst or "Connect Gemini" in stock.last_catalyst
             
-            if is_significant_move or is_missing_data:
+            # We don't want to overwrite the "Target Hit" message immediately if we just set it
+            if (is_significant_move or is_missing_data) and stock.strategy not in [STRAT_TARGET, STRAT_STOP]:
                 stock.last_catalyst = fetch_stock_catalyst(stock.ticker, stock.daily_change)
+                
     db.session.commit()
     return jsonify([s.to_dict() for s in stocks])
 
