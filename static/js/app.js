@@ -153,16 +153,35 @@ function renderStocks(stocks) {
         list.appendChild(item);
     });
 
-    // Calculate Analytics per Strategy
+    // Calculate Analytics per Strategy (Historical)
     strategies.forEach(strat => {
+        // Render List: Only stocks currently in this lane
         const stratStocks = stocks.filter(s => s.strategy === strat.name);
-        const statsEl = document.getElementById(`stats-${strat.name}`);
-        if (!statsEl || stratStocks.length === 0) return;
 
-        const totalRoi = stratStocks.reduce((acc, s) => acc + s.roi, 0);
-        const avgRoi = totalRoi / stratStocks.length;
-        const winners = stratStocks.filter(s => s.roi > 0).length;
-        const winRate = (winners / stratStocks.length) * 100;
+        // History Stats: Stocks that originated from this strategy
+        const originStocks = stocks.filter(s => {
+            if (s.original_strategy) return s.original_strategy === strat.name;
+            return s.strategy === strat.name; // Fallback
+        });
+
+        const statsEl = document.getElementById(`stats-${strat.name}`);
+        if (!statsEl) return;
+
+        // Hide stats for Target/Stop lanes themselves (optional, but cleaner)
+        if (['Target_Reached', 'Stop_Loss'].includes(strat.name)) {
+            statsEl.style.opacity = '0.3';
+        }
+
+        if (originStocks.length === 0) return;
+
+        // Calculate Win Rate based on Target Hits
+        // Definition of "Win": ROI >= 5% OR Strategy is "Target_Reached"
+        const winners = originStocks.filter(s => s.roi >= 5.0 || s.strategy === 'Target_Reached').length;
+        const winRate = (winners / originStocks.length) * 100;
+
+        // ROI Average
+        const totalRoi = originStocks.reduce((acc, s) => acc + s.roi, 0);
+        const avgRoi = totalRoi / originStocks.length;
 
         const roiValEl = statsEl.querySelector('.strat-roi-val');
         const winValEl = statsEl.querySelector('.strat-win-val');

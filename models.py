@@ -25,6 +25,7 @@ class Stock(db.Model):
     first_tracked = db.Column(db.DateTime, default=datetime.utcnow)
     movement_history = db.Column(db.Text, nullable=True) # JSON list of daily % changes
     added_date = db.Column(db.DateTime, default=datetime.utcnow)
+    original_strategy = db.Column(db.String(50), nullable=True) # Track source strategy for analytics
     
     def to_dict(self):
         roi = 0
@@ -35,6 +36,7 @@ class Stock(db.Model):
             'id': self.id,
             'ticker': self.ticker,
             'strategy': self.strategy,
+            'original_strategy': self.original_strategy if self.original_strategy else self.strategy,
             'entry_price': self.entry_price,
             'current_price': self.current_price,
             'daily_change': self.daily_change if self.daily_change is not None else 0.0,
